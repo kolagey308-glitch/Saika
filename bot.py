@@ -10,7 +10,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = "8507469444:AAGv0ZRhyazsuSdxkkr1eNRi3DTJdc127fw"
 ADMIN_ID = 1471307057
-WEBAPP_URL = "https://saika-store.vercel.app"  # ЗАМЕНИ НА СВОЙ VERCEL URL
+WEBAPP_URL = "https://saika-app-gamma.vercel.app/"  # ЗАМЕНИ НА СВОЙ VERCEL URL
 
 FILES_DB = "files_db.json"
 
