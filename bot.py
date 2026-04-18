@@ -57,105 +57,74 @@ CATALOG = {
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def emoji(id): 
-    return f'<tg-emoji emoji-id="{id}">👍</tg-emoji>'
+def emoji(id, char): 
+    return f'<tg-emoji emoji-id="{id}">{char}</tg-emoji>'
 
-# --- КЛАВИАТУРЫ СТРОГО ПО ФОРМАТУ ---
+# --- КЛАВИАТУРЫ КАК В ПРИМЕРЕ ---
 def main_menu():
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                text=f"{emoji('5938413566624272793')} Магазин",
-                callback_data="shop_bot"
-            ),
-            InlineKeyboardButton(
-                text=f"{emoji('5879770735999717115')} Профиль",
-                callback_data="profile"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="🌐 Web Магазин",
-                web_app=WebAppInfo(url=WEBAPP_URL)
-            )
+    return {
+        "inline_keyboard": [
+            [
+                {"text": f"{emoji('5938413566624272793', '🛒')} Магазин", "callback_data": "shop_bot"},
+                {"text": f"{emoji('5879770735999717115', '👤')} Профиль", "callback_data": "profile"}
+            ],
+            [
+                {"text": "🌐 Web Магазин", "web_app": {"url": WEBAPP_URL}}
+            ]
         ]
-    ])
+    }
 
 def shop_categories():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(
-            text=f"{emoji('5294298833071674944')} VPN ДЛЯ PUBG",
-            callback_data="cat_vpn"
-        )],
-        [InlineKeyboardButton(
-            text=f"{emoji('5296606007898705683')} МАГНИТ & ПАКИ",
-            callback_data="cat_extra"
-        )],
-        [InlineKeyboardButton(
-            text=f"{emoji('5330324013728158014')} DNS СЕРВИСЫ",
-            callback_data="cat_dns"
-        )],
-        [InlineKeyboardButton(
-            text=f"{emoji('5960671702059848143')} НАЗАД",
-            callback_data="back_menu"
-        )]
-    ])
+    return {
+        "inline_keyboard": [
+            [{"text": f"{emoji('5294298833071674944', '🔒')} VPN ДЛЯ PUBG", "callback_data": "cat_vpn"}],
+            [{"text": f"{emoji('5296606007898705683', '📦')} МАГНИТ & ПАКИ", "callback_data": "cat_extra"}],
+            [{"text": f"{emoji('5330324013728158014', '🌐')} DNS СЕРВИСЫ", "callback_data": "cat_dns"}],
+            [{"text": f"{emoji('5960671702059848143', '◀️')} НАЗАД", "callback_data": "back_menu"}]
+        ]
+    }
 
 def products_keyboard(category: str):
     keyboard = []
     for item in CATALOG[category]:
         old_price = f" ❗{item['old']}₽" if item['old'] else ""
         btn_text = f"{item['name']} | {item['price']}₽{old_price} | {item['stock']} шт."
-        keyboard.append([InlineKeyboardButton(text=btn_text, callback_data=f"buy_{category}_{item['name']}")])
-    keyboard.append([InlineKeyboardButton(
-        text=f"{emoji('5960671702059848143')} К КАТЕГОРИЯМ",
-        callback_data="shop_bot"
-    )])
-    return InlineKeyboardMarkup(keyboard)
+        keyboard.append([{"text": btn_text, "callback_data": f"buy_{category}_{item['name']}"}])
+    keyboard.append([{"text": f"{emoji('5960671702059848143', '◀️')} К КАТЕГОРИЯМ", "callback_data": "shop_bot"}])
+    return {"inline_keyboard": keyboard}
 
 def payment_keyboard(product: str, price: int):
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(
-            text=f"{emoji('5294351875917779401')} Я ОПЛАТИЛ, ОТПРАВИТЬ ЧЕК",
-            callback_data=f"paid_{product}_{price}"
-        )],
-        [InlineKeyboardButton(
-            text=f"{emoji('5960671702059848143')} ВЫБРАТЬ ДРУГОЙ ТОВАР",
-            callback_data="shop_bot"
-        )]
-    ])
+    return {
+        "inline_keyboard": [
+            [{"text": f"{emoji('5294351875917779401', '💳')} Я ОПЛАТИЛ, ОТПРАВИТЬ ЧЕК", "callback_data": f"paid_{product}_{price}"}],
+            [{"text": f"{emoji('5960671702059848143', '◀️')} ВЫБРАТЬ ДРУГОЙ ТОВАР", "callback_data": "shop_bot"}]
+        ]
+    }
 
 def admin_order_keyboard(order_id: str):
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                text="✅ ПОДТВЕРДИТЬ",
-                callback_data=f"confirm_{order_id}"
-            ),
-            InlineKeyboardButton(
-                text="❌ ОТКЛОНИТЬ",
-                callback_data=f"decline_{order_id}"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="📁 ЗАГРУЗИТЬ ФАЙЛ ДЛЯ ЗАКАЗА",
-                callback_data=f"uploadfile_{order_id}"
-            )
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "✅ ПОДТВЕРДИТЬ", "callback_data": f"confirm_{order_id}"},
+                {"text": "❌ ОТКЛОНИТЬ", "callback_data": f"decline_{order_id}"}
+            ],
+            [
+                {"text": "📁 ЗАГРУЗИТЬ ФАЙЛ", "callback_data": f"uploadfile_{order_id}"}
+            ]
         ]
-    ])
+    }
 
 # --- КОМАНДЫ ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome = f'''
-{emoji("5217822164362739968")} <b>SAIKA PREMIUM STORE</b>
+{emoji("5217822164362739968", "👑")} <b>SAIKA PREMIUM STORE</b>
 
 Привет! Ты находишься в @vpnsaika_bot
 
-{emoji("6030445631921721471")} Качественные впн и многое другое только у нас
+{emoji("6030445631921721471", "🔥")} Качественные впн и многое другое только у нас
 
-{emoji("5938413566624272793")} <b>Магазин</b> — выбор товаров
-{emoji("5879770735999717115")} <b>Профиль</b> — твои данные
+{emoji("5938413566624272793", "🛒")} <b>Магазин</b> — выбор товаров
+{emoji("5879770735999717115", "👤")} <b>Профиль</b> — твои данные
 
 Выбери действие ниже:
 '''
@@ -169,24 +138,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if data == "back_menu":
         await query.edit_message_text(
-            text=f"{emoji('5217822164362739968')} <b>ГЛАВНОЕ МЕНЮ</b>\n\nВыберите раздел:",
+            text=f"{emoji('5217822164362739968', '👑')} <b>ГЛАВНОЕ МЕНЮ</b>\n\nВыберите раздел:",
             reply_markup=main_menu(),
             parse_mode="HTML"
         )
     
     elif data == "shop_bot":
-        text = f"{emoji('5938413566624272793')} <b>МАГАЗИН</b>\n\n{emoji('5350291836378307462')} Выберите категорию:"
+        text = f"{emoji('5938413566624272793', '🛒')} <b>МАГАЗИН</b>\n\n{emoji('5350291836378307462', '📋')} Выберите категорию:"
         await query.edit_message_text(text=text, reply_markup=shop_categories(), parse_mode="HTML")
     
     elif data.startswith("cat_"):
         category = data.replace("cat_", "")
         titles = {
-            "vpn": f"{emoji('5294298833071674944')} VPN ДЛЯ PUBG",
-            "extra": f"{emoji('5296606007898705683')} МАГНИТ & ПАКИ",
-            "dns": f"{emoji('5330324013728158014')} DNS СЕРВИСЫ"
+            "vpn": f"{emoji('5294298833071674944', '🔒')} VPN ДЛЯ PUBG",
+            "extra": f"{emoji('5296606007898705683', '📦')} МАГНИТ & ПАКИ",
+            "dns": f"{emoji('5330324013728158014', '🌐')} DNS СЕРВИСЫ"
         }
         await query.edit_message_text(
-            text=f'{emoji("5350291836378307462")} <b>{titles[category]}</b>\n\nВыберите товар:',
+            text=f'{emoji("5350291836378307462", "📋")} <b>{titles[category]}</b>\n\nВыберите товар:',
             reply_markup=products_keyboard(category),
             parse_mode="HTML"
         )
@@ -199,7 +168,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_orders[user.id] = {"product": product, "price": item['price']}
             old_text = f" ❗{item['old']}₽" if item['old'] else ""
             text = f"""
-{emoji("5217822164362739968")} <b>ОФОРМЛЕНИЕ ЗАКАЗА</b>
+{emoji("5217822164362739968", "👑")} <b>ОФОРМЛЕНИЕ ЗАКАЗА</b>
 
 Товар: <b>{product}</b>
 Цена: <b>{item['price']}₽</b>{old_text}
@@ -208,14 +177,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ━━━━━━━━━━━━━━━━━━
 ✍️ <b>РЕКВИЗИТЫ ДЛЯ ОПЛАТЫ:</b>
 
-{emoji("5357059622505052938")} Банк: <b>Т-Банк</b>
-{emoji("5206607081334906820")} Карта: <code>2200 7021 4895 7363</code>
-{emoji("5879770735999717115")} Получатель: <b>Саид К.</b>
+{emoji("5357059622505052938", "😀")} Банк: <b>Т-Банк</b>
+{emoji("5206607081334906820", "👛")} Карта: <code>2200 7021 4895 7363</code>
+{emoji("5879770735999717115", "👤")} Получатель: <b>Саид К.</b>
 
 ━━━━━━━━━━━━━━━━━━
 <i>После оплаты нажмите кнопку ниже и загрузите скриншот чека</i>
-
-{emoji("5197269100878907942")} {emoji("5357059622505052938")} {emoji("5769126056262898415")} {emoji("5208893150692661284")}
 """
             await query.edit_message_text(text=text, reply_markup=payment_keyboard(product, item['price']), parse_mode="HTML")
     
@@ -231,24 +198,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💬 Можете добавить комментарий к фото
 
 <i>Администратор проверит и отправит файлы</i>
-
-{emoji("5296289868240948222")} {emoji("5258205968025525531")} {emoji("5465300082628763143")}
 """
         await query.edit_message_text(
             text=text, parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text=f"{emoji('5960671702059848143')} ОТМЕНА", callback_data="shop_bot")]])
+            reply_markup={"inline_keyboard": [[{"text": f"{emoji('5960671702059848143', '◀️')} ОТМЕНА", "callback_data": "shop_bot"}]]}
         )
         user_orders[user.id] = {"product": product, "price": price, "awaiting": "photo"}
     
     elif data == "profile":
         profile_text = f"""
-{emoji("5879770735999717115")} <b>ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ</b>
+{emoji("5879770735999717115", "👤")} <b>ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ</b>
 
-{emoji("5879770735999717115")} Имя: <b>{user.first_name} {user.last_name or ''}</b>
-{emoji("5886505193180239900")} ID: <code>{user.id}</code>
-{emoji("5814247475141153332")} Username: @{user.username or 'не указан'}
+{emoji("5879770735999717115", "👤")} Имя: <b>{user.first_name} {user.last_name or ''}</b>
+{emoji("5886505193180239900", "🆔")} ID: <code>{user.id}</code>
+{emoji("5814247475141153332", "📱")} Username: @{user.username or 'не указан'}
 
-{emoji("5890925363067886150")} Статус: {emoji("5217822164362739968")} <b>Premium Client</b>
+{emoji("5890925363067886150", "⭐")} Статус: {emoji("5217822164362739968", "👑")} <b>Premium Client</b>
 
 Для покупок откройте магазин 👇
 """
@@ -270,13 +235,11 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_id = order["user_id"]
                 product = order["product"]
                 
-                # Сначала описание
                 await context.bot.send_message(
                     chat_id=user_id,
-                    text=f"{emoji('5217822164362739968')} <b>ЗАКАЗ ГОТОВ!</b>\n\nТовар: <b>{product}</b>\n\nСпасибо за покупку!",
+                    text=f"{emoji('5217822164362739968', '👑')} <b>ЗАКАЗ ГОТОВ!</b>\n\nТовар: <b>{product}</b>\n\nСпасибо за покупку!",
                     parse_mode="HTML"
                 )
-                # Потом файл
                 await context.bot.send_photo(
                     chat_id=user_id,
                     photo=photo.file_id,
@@ -312,16 +275,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending_orders[order_id]["original_caption"] = admin_msg
     
     text = f"""
-{emoji("5217822164362739968")} <b>ЧЕК ПОЛУЧЕН!</b>
+{emoji("5217822164362739968", "👑")} <b>ЧЕК ПОЛУЧЕН!</b>
 
 Товар: <b>{product}</b>
 Сумма: <b>{price} ₽</b>
-Статус: {emoji("5296289868240948222")} <b>ОЖИДАЕТ ПРОВЕРКИ</b>
+Статус: {emoji("5296289868240948222", "⏳")} <b>ОЖИДАЕТ ПРОВЕРКИ</b>
 
 ✔️ Администратор проверит оплату и отправит файлы в этот чат.
 ✨ Обычно это занимает 5-15 минут.
-
-{emoji("5296289868240948222")} {emoji("5451732530048802485")} {emoji("5294351875917779401")} {emoji("5294082710317338135")}
 """
     await update.message.reply_text(text=text, parse_mode="HTML", reply_markup=main_menu())
     
@@ -358,7 +319,7 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=user_id,
             text=f"""
-{emoji("5217822164362739968")} <b>ОПЛАТА ПОДТВЕРЖДЕНА!</b>
+{emoji("5217822164362739968", "👑")} <b>ОПЛАТА ПОДТВЕРЖДЕНА!</b>
 
 Товар: <b>{product}</b>
 Статус: ✅ <b>УСПЕШНО</b>
@@ -371,19 +332,14 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_caption(
             caption=query.message.caption + "\n\n✅ <b>ПОДТВЕРЖДЕНО</b>\nНажмите \"ЗАГРУЗИТЬ ФАЙЛ\" чтобы отправить файл пользователю",
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton(
-                    text="📁 ЗАГРУЗИТЬ ФАЙЛ",
-                    callback_data=f"uploadfile_{order_id}"
-                )
-            ]])
+            reply_markup={"inline_keyboard": [[{"text": "📁 ЗАГРУЗИТЬ ФАЙЛ", "callback_data": f"uploadfile_{order_id}"}]]}
         )
         
         review_text = f"""
-{emoji("5440539497383087970")} <b>ОСТАВЬТЕ ОТЗЫВ ПОСЛЕ ПОЛУЧЕНИЯ</b> @saikamng
+{emoji("5440539497383087970", "📝")} <b>ОСТАВЬТЕ ОТЗЫВ ПОСЛЕ ПОЛУЧЕНИЯ</b> @saikamng
 
-{emoji("5314504236132747481")} СЛИЛ ТОВАР
-{emoji("5206607081334906820")} ИСПОРТИЛ ЕГО И ПОТЕРЯЛ ДЕНЬГИ
+{emoji("5314504236132747481", "💔")} СЛИЛ ТОВАР
+{emoji("5206607081334906820", "😡")} ИСПОРТИЛ ЕГО И ПОТЕРЯЛ ДЕНЬГИ
 """
         await context.bot.send_message(chat_id=user_id, text=review_text, parse_mode="HTML")
     
@@ -391,7 +347,7 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=user_id,
             text=f"""
-{emoji("5294082710317338135")} <b>ОПЛАТА НЕ ПОДТВЕРЖДЕНА</b>
+{emoji("5294082710317338135", "❌")} <b>ОПЛАТА НЕ ПОДТВЕРЖДЕНА</b>
 
 Товар: <b>{product}</b>
 Сумма: <b>{price} ₽</b>
@@ -402,7 +358,7 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         await query.edit_message_caption(
-            caption=query.message.caption + f"\n\n{emoji('5294082710317338135')} <b>ОТКЛОНЕНО</b>",
+            caption=query.message.caption + f"\n\n{emoji('5294082710317338135', '❌')} <b>ОТКЛОНЕНО</b>",
             parse_mode="HTML"
         )
         
@@ -422,13 +378,11 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_id = order["user_id"]
                 product = order["product"]
                 
-                # Сначала описание
                 await context.bot.send_message(
                     chat_id=user_id,
-                    text=f"{emoji('5217822164362739968')} <b>ЗАКАЗ ГОТОВ!</b>\n\nТовар: <b>{product}</b>\n\nСпасибо за покупку!",
+                    text=f"{emoji('5217822164362739968', '👑')} <b>ЗАКАЗ ГОТОВ!</b>\n\nТовар: <b>{product}</b>\n\nСпасибо за покупку!",
                     parse_mode="HTML"
                 )
-                # Потом файл
                 await context.bot.send_document(
                     chat_id=user_id,
                     document=doc.file_id,
@@ -466,7 +420,7 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pending_orders[order_id]["original_caption"] = admin_msg
     
     await update.effective_message.reply_text(
-        text=f"{emoji('5217822164362739968')} <b>ЗАКАЗ ПРИНЯТ!</b>\n\nТовар: {product}\nСумма: {price}₽\nСтатус: {emoji('5296289868240948222')} ОЖИДАЕТ",
+        text=f"{emoji('5217822164362739968', '👑')} <b>ЗАКАЗ ПРИНЯТ!</b>\n\nТовар: {product}\nСумма: {price}₽\nСтатус: {emoji('5296289868240948222', '⏳')} ОЖИДАЕТ",
         parse_mode="HTML"
     )
 
