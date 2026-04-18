@@ -546,4 +546,6 @@ def main():
     logger.info("🚀 Бот запущен!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
-if __name__ == "__main_
+if __name__ == "__main__":
+    os.makedirs("files", exist_ok=True)
+    main()
