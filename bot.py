@@ -10,7 +10,7 @@ from telegram import Update, Bot
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # --- НАСТРОЙКИ ---
-BOT_TOKEN = "8507469444:AAGv0ZRhyazsuSdxkkr1eNRi3DTJdc127fw"
+BOT_TOKEN = "8451686285:AAFWffo20dsC1f3XSFpLKDtAQpZWmcgKJyM"
 MAIN_ADMIN = 1471307057
 SECOND_ADMIN = 7066870264
 WEBAPP_URL = "https://saika-app-gamma.vercel.app/"
