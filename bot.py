@@ -9,7 +9,32 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = "8507469444:AAGv0ZRhyazsuSdxkkr1eNRi3DTJdc127fw"
 ADMIN_ID = 1471307057
-WEBAPP_URL = "https://saika.up.railway.app"  # Твой Railway домен
+WEBAPP_URL = "https://saika-production.up.railway.app"  # Твой Railway домен
+
+# Каталог товаров
+CATALOG = {
+    "vpn": [
+        {"name": "SAIKA S1 VPN", "price": 79, "old": 1199, "stock": 9},
+        {"name": "VIP VPN", "price": 79, "old": 529, "stock": 10},
+        {"name": "GTR VPN", "price": 79, "old": 899, "stock": "∞"},
+        {"name": "ULTRA MAX VPN", "price": 79, "old": 629, "stock": 8},
+        {"name": "STRONG VPN", "price": 79, "old": 499, "stock": "∞"},
+        {"name": "UNLY VPN", "price": 79, "old": 399, "stock": "∞"},
+        {"name": "TDM SKILL VPN", "price": 79, "old": 199, "stock": "∞"},
+        {"name": "FUCK VPN", "price": 49, "old": 139, "stock": "∞"},
+        {"name": "DEAD ALL VPN", "price": 79, "old": 1299, "stock": "∞"}
+    ],
+    "extra": [
+        {"name": "Магнит андроид", "price": 169, "old": 259, "stock": "∞"},
+        {"name": "Магнит ios", "price": 269, "old": None, "stock": "∞"},
+        {"name": "Пак сайки", "price": 639, "old": 1789, "stock": "∞"},
+        {"name": "Пак unly", "price": 79, "old": 1299, "stock": 10}
+    ],
+    "dns": [
+        {"name": "DNS android", "price": 129, "old": 239, "stock": "∞"},
+        {"name": "DNS Ios", "price": 129, "old": 239, "stock": "∞"}
+    ]
+}
 
 # База файлов для товаров
 PRODUCT_FILES = {
@@ -33,12 +58,40 @@ PRODUCT_FILES = {
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Временное хранилище выбранных товаров
+user_orders = {}
+
 # --- КЛАВИАТУРЫ ---
 def main_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛍️ ОТКРЫТЬ МАГАЗИН", web_app=WebAppInfo(url=WEBAPP_URL))],
+        [InlineKeyboardButton("🛍️ WEB МАГАЗИН", web_app=WebAppInfo(url=WEBAPP_URL))],
+        [InlineKeyboardButton("🏪 МАГАЗИН В БОТЕ", callback_data="shop_bot")],
         [InlineKeyboardButton("👤 МОЙ ПРОФИЛЬ", callback_data="profile")],
         [InlineKeyboardButton("ℹ️ ПОДДЕРЖКА", callback_data="support")]
+    ])
+
+def shop_categories():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔒 VPN ДЛЯ PUBG", callback_data="cat_vpn")],
+        [InlineKeyboardButton("📦 МАГНИТ & ПАКИ", callback_data="cat_extra")],
+        [InlineKeyboardButton("🌐 DNS СЕРВИСЫ", callback_data="cat_dns")],
+        [InlineKeyboardButton("◀️ НАЗАД", callback_data="back_menu")]
+    ])
+
+def products_keyboard(category: str):
+    keyboard = []
+    for item in CATALOG[category]:
+        old_price = f" ❗{item['old']}₽" if item['old'] else ""
+        stock = f" | {item['stock']} шт."
+        btn_text = f"{item['name']} | {item['price']}₽{old_price}{stock}"
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"buy_{category}_{item['name']}")])
+    keyboard.append([InlineKeyboardButton("◀️ К КАТЕГОРИЯМ", callback_data="shop_bot")])
+    return InlineKeyboardMarkup(keyboard)
+
+def payment_keyboard(product: str, price: int):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("💳 Я ОПЛАТИЛ, ОТПРАВИТЬ ЧЕК", callback_data=f"paid_{product}_{price}")],
+        [InlineKeyboardButton("◀️ ВЫБРАТЬ ДРУГОЙ ТОВАР", callback_data="shop_bot")]
     ])
 
 def admin_order_keyboard(user_id: int, product: str):
@@ -70,7 +123,90 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    if query.data == "profile":
+    data = query.data
+    
+    # Назад в меню
+    if data == "back_menu":
+        await query.edit_message_text(
+            "<b>🏠 ГЛАВНОЕ МЕНЮ</b>\n\nВыберите раздел:",
+            reply_markup=main_menu(),
+            parse_mode="HTML"
+        )
+    
+    # Магазин в боте
+    elif data == "shop_bot":
+        await query.edit_message_text(
+            "<tg-emoji emoji-id="5938413566624272793">🛒</tg-emoji> <b>МАГАЗИН</b>\n\n<tg-emoji emoji-id="5350291836378307462">📋</tg-emoji> Выберите категорию:",
+            reply_markup=shop_categories(),
+            parse_mode="HTML"
+        )
+    
+    # Категории
+    elif data.startswith("cat_"):
+        category = data.replace("cat_", "")
+        titles = {"vpn": "🔒 VPN ДЛЯ PUBG", "extra": "📦 МАГНИТ & ПАКИ", "dns": "🌐 DNS СЕРВИСЫ"}
+        await query.edit_message_text(
+            f"<tg-emoji emoji-id='5350291836378307462'>📋</tg-emoji> <b>{titles[category]}</b>\n\nВыберите товар:",
+            reply_markup=products_keyboard(category),
+            parse_mode="HTML"
+        )
+    
+    # Выбор товара
+    elif data.startswith("buy_"):
+        _, category, product = data.split("_", 2)
+        item = next((x for x in CATALOG[category] if x['name'] == product), None)
+        
+        if item:
+            user_orders[query.from_user.id] = {"product": product, "price": item['price']}
+            
+            old_text = f" ❗{item['old']}₽" if item['old'] else ""
+            text = f"""
+<tg-emoji emoji-id="5217822164362739968">👑</tg-emoji> <b>ОФОРМЛЕНИЕ ЗАКАЗА</b>
+
+Товар: <b>{product}</b>
+Цена: <b>{item['price']}₽</b>{old_text}
+В наличии: {item['stock']} шт.
+
+━━━━━━━━━━━━━━━━━━
+<b>📋 РЕКВИЗИТЫ ДЛЯ ОПЛАТЫ:</b>
+
+🏦 Банк: <b>Т-Банк</b>
+💳 Карта: <code>2200 7021 4895 7363</code>
+👤 Получатель: <b>Саид К.</b>
+
+━━━━━━━━━━━━━━━━━━
+<i>После оплаты нажмите кнопку ниже и загрузите скриншот чека</i>
+"""
+            await query.edit_message_text(
+                text,
+                reply_markup=payment_keyboard(product, item['price']),
+                parse_mode="HTML"
+            )
+    
+    # Кнопка "Я оплатил"
+    elif data.startswith("paid_"):
+        _, product, price = data.split("_", 2)
+        await query.edit_message_text(
+            f"""
+<tg-emoji emoji-id="5217822164362739968">👑</tg-emoji> <b>ЗАГРУЗИТЕ ЧЕК</b>
+
+Товар: <b>{product}</b>
+Сумма: <b>{price}₽</b>
+
+📸 Отправьте скриншот оплаты <b>ПРЯМО В ЭТОТ ЧАТ</b>
+💬 Можете добавить комментарий к фото
+
+<i>Администратор проверит и отправит файлы</i>
+""",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("◀️ ОТМЕНА", callback_data="shop_bot")]
+            ])
+        )
+        user_orders[query.from_user.id] = {"product": product, "price": price, "awaiting": "photo"}
+    
+    # Профиль
+    elif data == "profile":
         user = query.from_user
         profile_text = f"""
 <tg-emoji emoji-id="5883964170268840032">👤</tg-emoji> <b>ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ</b>
@@ -85,7 +221,8 @@ Username: @{user.username or 'не указан'}
 """
         await query.edit_message_text(profile_text, reply_markup=main_menu(), parse_mode="HTML")
     
-    elif query.data == "support":
+    # Поддержка
+    elif data == "support":
         support_text = """
 <b>ℹ️ ПОДДЕРЖКА SAIKA STORE</b>
 
@@ -100,6 +237,60 @@ Username: @{user.username or 'не указан'}
 """
         await query.edit_message_text(support_text, reply_markup=main_menu(), parse_mode="HTML")
 
+# Обработка фото (чеков)
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    photo = update.message.photo[-1]
+    caption = update.message.caption or ""
+    
+    order = user_orders.get(user.id, {})
+    product = order.get('product', 'Неизвестный товар')
+    price = order.get('price', '?')
+    
+    # Скачиваем фото
+    file = await context.bot.get_file(photo.file_id)
+    photo_bytes = await file.download_as_bytearray()
+    
+    # Отправляем админу
+    admin_msg = f"""
+<b>🛒 НОВЫЙ ЗАКАЗ #{user.id}</b>
+
+Товар: <b>{product}</b>
+Сумма: <b>{price} ₽</b>
+
+Покупатель: @{user.username or user.first_name} (ID: <code>{user.id}</code>)
+
+Комментарий: {caption or 'нет'}
+"""
+    
+    await context.bot.send_photo(
+        chat_id=ADMIN_ID,
+        photo=BytesIO(photo_bytes),
+        caption=admin_msg,
+        reply_markup=admin_order_keyboard(user.id, product),
+        parse_mode="HTML"
+    )
+    
+    # Уведомление пользователю
+    await update.message.reply_text(
+        f"""
+<tg-emoji emoji-id="5217822164362739968">👑</tg-emoji> <b>ЧЕК ПОЛУЧЕН!</b>
+
+Товар: <b>{product}</b>
+Сумма: <b>{price} ₽</b>
+Статус: <code>⏳ ОЖИДАЕТ ПРОВЕРКИ</code>
+
+Администратор проверит оплату и отправит файлы в этот чат.
+Обычно это занимает 5-15 минут.
+""",
+        parse_mode="HTML",
+        reply_markup=main_menu()
+    )
+    
+    # Очищаем ожидание
+    if user.id in user_orders:
+        del user_orders[user.id]
+
 # Обработка данных из WebApp
 async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -112,9 +303,8 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     comment = data.get('comment', '')
     screenshot = data.get('screenshot')
     
-    # Сообщение админу
     admin_msg = f"""
-<b>🛒 НОВЫЙ ЗАКАЗ #{user_id}</b>
+<b>🛒 НОВЫЙ ЗАКАЗ #{user_id} (WEB APP)</b>
 
 Товар: <b>{product}</b>
 Сумма: <b>{price} ₽</b>
@@ -125,7 +315,6 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
 Комментарий: {comment or 'нет'}
 """
     
-    # Отправляем скриншот админу если есть
     if screenshot and screenshot.startswith('data:image'):
         try:
             image_data = base64.b64decode(screenshot.split(',')[1])
@@ -155,7 +344,6 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
     
-    # Сообщение пользователю
     user_msg = f"""
 <tg-emoji emoji-id="5217822164362739968">👑</tg-emoji> <b>ЗАКАЗ ПРИНЯТ</b>
 
@@ -180,7 +368,6 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = int(data[1])
         product = "_".join(data[2:])
         
-        # Уведомление пользователю
         await context.bot.send_message(
             chat_id=user_id,
             text=f"""
@@ -194,7 +381,6 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
         
-        # Отправка файлов
         files_sent = 0
         if product in PRODUCT_FILES:
             for file_path in PRODUCT_FILES[product]:
@@ -216,7 +402,6 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text="⚠️ Файлы готовятся, администратор отправит их вручную.\nОжидайте..."
             )
         
-        # Обновление сообщения админа
         await query.edit_message_caption(
             caption=query.message.caption + f"\n\n✅ <b>ПОДТВЕРЖДЕНО</b>\nФайлов отправлено: {files_sent}",
             parse_mode="HTML"
@@ -269,15 +454,24 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
 
-# Обработка ответа пользователя
-async def handle_user_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Обработка текстовых сообщений
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.effective_message.text
     
+    # Если пользователь ожидал загрузку фото, но отправил текст
+    if user.id in user_orders and user_orders[user.id].get('awaiting'):
+        await update.message.reply_text(
+            "📸 Пожалуйста, отправьте <b>ФОТО ЧЕКА</b>, а не текст.\n\nЕсли оплата не прошла - нажмите /start для нового заказа.",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Обычное сообщение - пересылаем админу
     await context.bot.send_message(
         chat_id=ADMIN_ID,
         text=f"""
-📨 <b>ОТВЕТ ОТ ПОЛЬЗОВАТЕЛЯ</b>
+📨 <b>СООБЩЕНИЕ ОТ ПОЛЬЗОВАТЕЛЯ</b>
 
 От: @{user.username or user.first_name} (ID: <code>{user.id}</code>)
 
@@ -286,33 +480,28 @@ async def handle_user_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """,
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Подтвердить заказ", callback_data=f"confirm_{user.id}_manual")],
             [InlineKeyboardButton("↩️ Ответить", url=f"tg://user?id={user.id}")]
         ])
     )
     
-    await update.effective_message.reply_text(
+    await update.message.reply_text(
         "✅ Ваше сообщение отправлено администратору. Ожидайте ответа.",
         parse_mode="HTML"
     )
 
 def main():
-    # Создаем Application
     app = Application.builder().token(BOT_TOKEN).build()
     
-    # Добавляем обработчики
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler, pattern="^(profile|support)$"))
+    app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(CallbackQueryHandler(admin_action, pattern="^(confirm|decline|ask)_"))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_user_reply))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
     logger.info("🚀 Бот запущен!")
-    
-    # Запускаем поллинг
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    # Создаем папку для файлов
     os.makedirs("files", exist_ok=True)
     main()
