@@ -15,7 +15,6 @@
             --price-green: #00ff88;
             --old-red: #ff3b3b;
             --text-main: #ffffff;
-            --glass: rgba(255, 255, 255, 0.03);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -28,7 +27,6 @@
             min-height: 100vh;
         }
 
-        /* HEADER */
         .header { padding: 45px 20px 30px; text-align: center; }
         .logo-wrapper {
             position: relative;
@@ -48,20 +46,10 @@
             box-shadow: 0 15px 35px rgba(0, 136, 255, 0.4);
             transform: rotate(-5deg);
         }
-        .logo-wrapper::after {
-            content: '';
-            position: absolute;
-            inset: -10px;
-            background: var(--neon-blue);
-            filter: blur(25px);
-            opacity: 0.3;
-            z-index: -1;
-        }
 
         .brand-title { font-size: 28px; font-weight: 900; letter-spacing: 1px; color: #fff; margin-bottom: 5px; }
         .brand-subtitle { font-size: 11px; color: var(--neon-blue); text-transform: uppercase; letter-spacing: 4px; font-weight: 700; opacity: 0.8; }
 
-        /* NAVIGATION */
         .navigation {
             display: flex;
             background: var(--card-bg);
@@ -80,7 +68,7 @@
             font-weight: 800;
             text-align: center;
             cursor: pointer;
-            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: 0.4s;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -94,7 +82,6 @@
         .page.active { display: block; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* CATALOG */
         .section-header {
             font-size: 12px;
             font-weight: 900;
@@ -106,7 +93,6 @@
             text-transform: uppercase;
             letter-spacing: 2px;
         }
-        .section-header i { font-size: 16px; }
 
         .product-card {
             background: var(--card-bg);
@@ -146,7 +132,6 @@
         
         .availability { font-size: 11px; color: #5c657a; margin-top: 8px; font-weight: 600; }
 
-        /* PROFILE */
         .profile-container {
             background: linear-gradient(180deg, var(--card-bg) 0%, rgba(10,15,30,0) 100%);
             border-radius: 35px;
@@ -165,22 +150,7 @@
             object-fit: cover;
         }
         .user-name { font-size: 26px; font-weight: 900; }
-        .user-stats {
-            display: flex;
-            gap: 15px;
-            margin-top: 30px;
-        }
-        .stat-card {
-            flex: 1;
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 24px;
-            border: 1px solid rgba(255,255,255,0.03);
-        }
-        .stat-val { font-size: 24px; font-weight: 900; color: #fff; display: block; }
-        .stat-label { font-size: 10px; color: var(--neon-blue); font-weight: 800; text-transform: uppercase; margin-top: 5px; }
 
-        /* CHECKOUT */
         .checkout-box {
             background: var(--card-bg);
             border-radius: 35px;
@@ -201,20 +171,8 @@
             border: 1px solid rgba(255,255,255,0.05);
         }
         .detail-row { margin-bottom: 18px; }
-        .detail-row:last-child { margin-bottom: 0; }
         .detail-label { font-size: 11px; color: #5c657a; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; display: block; }
         .detail-val { font-size: 17px; font-weight: 700; color: #fff; font-family: 'Courier New', monospace; letter-spacing: 1px; }
-        .copy-btn {
-            background: rgba(0,136,255,0.2);
-            border: 1px solid var(--neon-blue);
-            color: var(--neon-blue);
-            padding: 6px 15px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: 700;
-            margin-left: 10px;
-            cursor: pointer;
-        }
 
         .btn-pay {
             background: var(--blue-grad);
@@ -230,7 +188,6 @@
             cursor: pointer;
         }
 
-        /* MODAL */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -239,12 +196,8 @@
             z-index: 1000;
             padding: 20px;
             overflow-y: auto;
-            backdrop-filter: blur(10px);
         }
-        .modal-content {
-            max-width: 500px;
-            margin: 30px auto;
-        }
+        .modal-content { max-width: 500px; margin: 30px auto; }
         .upload-area {
             background: rgba(0,136,255,0.05);
             border: 2px dashed var(--neon-blue);
@@ -253,9 +206,7 @@
             text-align: center;
             margin: 20px 0;
             cursor: pointer;
-            transition: 0.3s;
         }
-        .upload-area:hover { background: rgba(0,136,255,0.1); }
         .upload-area i { font-size: 48px; color: var(--neon-blue); margin-bottom: 15px; }
         
         #previewImage {
@@ -287,12 +238,6 @@
             font-weight: 900;
             font-size: 16px;
             cursor: pointer;
-            box-shadow: 0 10px 30px rgba(0,255,136,0.3);
-        }
-        
-        .btn-send:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
         }
     </style>
 </head>
@@ -311,7 +256,6 @@
     <div class="nav-link" onclick="tab('profile')">Аккаунт</div>
 </div>
 
-<!-- SHOP PAGE -->
 <div id="shop" class="page active">
     <div class="section-header"><i class="fas fa-shield-halved"></i> VPN SERVICES</div>
     <div id="list-vpn"></div>
@@ -323,27 +267,14 @@
     <div id="list-dns"></div>
 </div>
 
-<!-- PROFILE PAGE -->
 <div id="profile" class="page">
     <div class="profile-container">
         <img id="u-avatar" class="user-pic" src="https://via.placeholder.com/150">
         <h2 id="u-name" class="user-name">Premium Client</h2>
         <p id="u-id" style="color:#5c657a; font-size:13px; margin-top:8px; font-weight:600;">UID: 000000000</p>
-        
-        <div class="user-stats">
-            <div class="stat-card">
-                <span class="stat-val" id="order-count">0</span>
-                <span class="stat-label">Заказов</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-val" style="color: var(--price-green);">Active</span>
-                <span class="stat-label">Status</span>
-            </div>
-        </div>
     </div>
 </div>
 
-<!-- PAYMENT PAGE -->
 <div id="pay" class="page">
     <div class="checkout-box">
         <div class="checkout-title">Payment Invoice</div>
@@ -351,27 +282,16 @@
         <div class="checkout-price" id="pay-total">0 ₽</div>
         
         <div class="bank-details">
-            <div class="detail-row">
-                <span class="detail-label">Payment Network:</span>
-                <b class="detail-val">Т-Банк (Tinkoff)</b>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Card Number:</span>
-                <b class="detail-val">2200 7021 4895 7363</b>
-                <button class="copy-btn" onclick="copyCard()">Копировать</button>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Account Holder:</span>
-                <b class="detail-val">Саид К.</b>
-            </div>
+            <div class="detail-row"><span class="detail-label">Банк:</span><b class="detail-val">Т-Банк</b></div>
+            <div class="detail-row"><span class="detail-label">Карта:</span><b class="detail-val">2200 7021 4895 7363</b></div>
+            <div class="detail-row"><span class="detail-label">Получатель:</span><b class="detail-val">Саид К.</b></div>
         </div>
         
         <button class="btn-pay" onclick="openUploadModal()">Я ОПЛАТИЛ, ЗАГРУЗИТЬ ЧЕК</button>
-        <p style="margin-top:20px; font-size:12px; color:#5c657a; font-weight:700; cursor:pointer;" onclick="tab('shop')">ОТМЕНИТЬ ТРАНЗАКЦИЮ</p>
+        <p style="margin-top:20px; font-size:12px; color:#5c657a; font-weight:700; cursor:pointer;" onclick="tab('shop')">ОТМЕНИТЬ</p>
     </div>
 </div>
 
-<!-- UPLOAD MODAL -->
 <div class="modal-overlay" id="uploadModal">
     <div class="modal-content">
         <div class="checkout-box">
@@ -381,19 +301,16 @@
             
             <div class="upload-area" onclick="document.getElementById('fileInput').click()">
                 <i class="fas fa-cloud-upload-alt"></i>
-                <p style="font-size:14px; font-weight:600;">Нажмите чтобы загрузить скриншот оплаты</p>
-                <p style="font-size:11px; color:#5c657a; margin-top:8px;">JPG, PNG, GIF до 10MB</p>
+                <p style="font-size:14px; font-weight:600;">Нажмите чтобы загрузить скриншот</p>
             </div>
             
             <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleFileSelect(this)">
             
             <img id="previewImage" src="" alt="Preview">
             
-            <textarea class="comment-input" id="orderComment" placeholder="Комментарий к платежу (время, сумма, детали)..."></textarea>
+            <textarea class="comment-input" id="orderComment" placeholder="Комментарий к платежу..."></textarea>
             
-            <button class="btn-send" id="sendBtn" onclick="sendOrderToBot()" disabled>
-                <i class="fas fa-paper-plane"></i> ОТПРАВИТЬ НА ПРОВЕРКУ
-            </button>
+            <button class="btn-send" id="sendBtn" onclick="sendOrderToBot()" disabled>ОТПРАВИТЬ НА ПРОВЕРКУ</button>
             
             <p style="margin-top:15px; font-size:12px; color:#5c657a; cursor:pointer;" onclick="closeModal()">← Назад</p>
         </div>
@@ -407,8 +324,6 @@
     
     let currentOrder = {};
     let selectedFile = null;
-    let orderCount = localStorage.getItem('saika_orders') || 0;
-    document.getElementById('order-count').innerText = orderCount;
 
     const products = {
         vpn: [
@@ -446,9 +361,8 @@
                             <span class="price-new">${p.p} ₽</span>
                             ${p.o ? `<span class="price-old">${p.o} ₽</span>` : ''}
                         </div>
-                        <div class="availability">In Stock: ${p.s} units</div>
+                        <div class="availability">В наличии: ${p.s} шт.</div>
                     </div>
-                    <i class="fas fa-arrow-right" style="color: #252d41; font-size: 16px;"></i>
                 </div>`;
                 document.getElementById('list-' + cat).innerHTML += el;
             });
@@ -470,15 +384,6 @@
         document.getElementById('pay-name').innerText = name;
         document.getElementById('pay-total').innerText = price + ' ₽';
         tab('pay');
-    }
-
-    function copyCard() {
-        navigator.clipboard?.writeText('2200702148957363');
-        tg.showPopup({
-            title: '✅ Скопировано',
-            message: 'Номер карты в буфере обмена',
-            buttons: [{type: 'ok'}]
-        });
     }
 
     function openUploadModal() {
@@ -513,7 +418,6 @@
         const user = tg.initDataUnsafe.user;
         const comment = document.getElementById('orderComment').value;
         
-        // Отправляем данные в бота
         const orderData = {
             product: currentOrder.name,
             price: currentOrder.price,
@@ -523,26 +427,13 @@
             timestamp: new Date().toISOString()
         };
         
-             // Если есть файл - конвертируем в base64 и отправляем
         if (selectedFile) {
             const reader = new FileReader();
             reader.onload = (e) => {
                 orderData.screenshot = e.target.result;
                 tg.sendData(JSON.stringify(orderData));
-                
-                // Увеличиваем счетчик заказов
-                orderCount++;
-                localStorage.setItem('saika_orders', orderCount);
-                
-                tg.showPopup({
-                    title: '✅ Заказ отправлен!',
-                    message: 'Администратор проверит оплату и отправит файлы в этот чат',
-                    buttons: [{type: 'ok'}]
-                });
-                
-                setTimeout(() => {
-                    tg.close();
-                }, 2000);
+                tg.showPopup({title: '✅ Заказ отправлен!', message: 'Ожидайте проверки', buttons: [{type: 'ok'}]});
+                setTimeout(() => tg.close(), 2000);
             };
             reader.readAsDataURL(selectedFile);
         } else {
@@ -551,11 +442,10 @@
         }
     }
 
-    // Load User
     const u = tg.initDataUnsafe.user;
     if(u) {
         document.getElementById('u-name').innerText = u.first_name + (u.last_name ? ' ' + u.last_name : '');
-        document.getElementById('u-id').innerText = "CLIENT ID: " + u.id;
+        document.getElementById('u-id').innerText = "ID: " + u.id;
         if(u.photo_url) document.getElementById('u-avatar').src = u.photo_url;
     }
 
@@ -564,4 +454,3 @@
 </script>
 </body>
 </html>
-          
