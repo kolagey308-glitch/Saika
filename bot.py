@@ -5,13 +5,14 @@ import os
 import asyncio
 from io import BytesIO
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, Bot
+from telegram import Update, Bot
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = "8507469444:AAGv0ZRhyazsuSdxkkr1eNRi3DTJdc127fw"
-ADMIN_ID = 1471307057
-WEBAPP_URL = "https://saika-store.vercel.app"
+MAIN_ADMIN = 1471307057  # ТЫ - главный админ
+SECOND_ADMIN = 7066870264  # ID второго админа (замени на реальный)
+WEBAPP_URL = "https://saika-app-gamma.vercel.app/"
 
 FILES_DB = "files_db.json"
 
@@ -60,13 +61,13 @@ logger = logging.getLogger(__name__)
 def emoji(id, char): 
     return f'<tg-emoji emoji-id="{id}">{char}</tg-emoji>'
 
-# --- КЛАВИАТУРЫ КАК В ПРИМЕРЕ ---
+# --- КЛАВИАТУРЫ ---
 def main_menu():
     return {
         "inline_keyboard": [
             [
-                {"text": f"{emoji('5938413566624272793', '🛒')} Магазин", "callback_data": "shop_bot"},
-                {"text": f"{emoji('5879770735999717115', '👤')} Профиль", "callback_data": "profile"}
+                {"text": "🛍️ Магазин", "callback_data": "shop_bot", "icon_custom_emoji_id": "5938413566624272793"},
+                {"text": "👤 Профиль", "callback_data": "profile", "icon_custom_emoji_id": "5879770735999717115"}
             ],
             [
                 {"text": "🌐 Web Магазин", "web_app": {"url": WEBAPP_URL}}
@@ -77,10 +78,10 @@ def main_menu():
 def shop_categories():
     return {
         "inline_keyboard": [
-            [{"text": f"{emoji('5294298833071674944', '🔒')} VPN ДЛЯ PUBG", "callback_data": "cat_vpn"}],
-            [{"text": f"{emoji('5296606007898705683', '📦')} МАГНИТ & ПАКИ", "callback_data": "cat_extra"}],
-            [{"text": f"{emoji('5330324013728158014', '🌐')} DNS СЕРВИСЫ", "callback_data": "cat_dns"}],
-            [{"text": f"{emoji('5960671702059848143', '◀️')} НАЗАД", "callback_data": "back_menu"}]
+            [{"text": "VPN ДЛЯ PUBG", "callback_data": "cat_vpn", "icon_custom_emoji_id": "5294298833071674944"}],
+            [{"text": "МАГНИТ & ПАКИ", "callback_data": "cat_extra", "icon_custom_emoji_id": "5296606007898705683"}],
+            [{"text": "DNS СЕРВИСЫ", "callback_data": "cat_dns", "icon_custom_emoji_id": "5330324013728158014"}],
+            [{"text": "НАЗАД", "callback_data": "back_menu", "icon_custom_emoji_id": "5960671702059848143"}]
         ]
     }
 
@@ -90,14 +91,14 @@ def products_keyboard(category: str):
         old_price = f" ❗{item['old']}₽" if item['old'] else ""
         btn_text = f"{item['name']} | {item['price']}₽{old_price} | {item['stock']} шт."
         keyboard.append([{"text": btn_text, "callback_data": f"buy_{category}_{item['name']}"}])
-    keyboard.append([{"text": f"{emoji('5960671702059848143', '◀️')} К КАТЕГОРИЯМ", "callback_data": "shop_bot"}])
+    keyboard.append([{"text": "К КАТЕГОРИЯМ", "callback_data": "shop_bot", "icon_custom_emoji_id": "5960671702059848143"}])
     return {"inline_keyboard": keyboard}
 
 def payment_keyboard(product: str, price: int):
     return {
         "inline_keyboard": [
-            [{"text": f"{emoji('5294351875917779401', '💳')} Я ОПЛАТИЛ, ОТПРАВИТЬ ЧЕК", "callback_data": f"paid_{product}_{price}"}],
-            [{"text": f"{emoji('5960671702059848143', '◀️')} ВЫБРАТЬ ДРУГОЙ ТОВАР", "callback_data": "shop_bot"}]
+            [{"text": "Я ОПЛАТИЛ, ОТПРАВИТЬ ЧЕК", "callback_data": f"paid_{product}_{price}", "icon_custom_emoji_id": "5294351875917779401"}],
+            [{"text": "ВЫБРАТЬ ДРУГОЙ ТОВАР", "callback_data": "shop_bot", "icon_custom_emoji_id": "5960671702059848143"}]
         ]
     }
 
@@ -105,14 +106,18 @@ def admin_order_keyboard(order_id: str):
     return {
         "inline_keyboard": [
             [
-                {"text": "✅ ПОДТВЕРДИТЬ", "callback_data": f"confirm_{order_id}"},
-                {"text": "❌ ОТКЛОНИТЬ", "callback_data": f"decline_{order_id}"}
+                {"text": "ПОДТВЕРДИТЬ", "callback_data": f"confirm_{order_id}", "icon_custom_emoji_id": "5310076249404621168"},
+                {"text": "ОТКЛОНИТЬ", "callback_data": f"decline_{order_id}", "icon_custom_emoji_id": "5310169226856644648"}
             ],
             [
-                {"text": "📁 ЗАГРУЗИТЬ ФАЙЛ", "callback_data": f"uploadfile_{order_id}"}
+                {"text": "ЗАГРУЗИТЬ ФАЙЛ", "callback_data": f"uploadfile_{order_id}", "icon_custom_emoji_id": "5465300082628763143"}
             ]
         ]
     }
+
+# --- ПРОВЕРКА АДМИНА ---
+def is_admin(user_id):
+    return user_id in [MAIN_ADMIN, SECOND_ADMIN]
 
 # --- КОМАНДЫ ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -201,7 +206,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
         await query.edit_message_text(
             text=text, parse_mode="HTML",
-            reply_markup={"inline_keyboard": [[{"text": f"{emoji('5960671702059848143', '◀️')} ОТМЕНА", "callback_data": "shop_bot"}]]}
+            reply_markup={"inline_keyboard": [[{"text": "ОТМЕНА", "callback_data": "shop_bot", "icon_custom_emoji_id": "5960671702059848143"}]]}
         )
         user_orders[user.id] = {"product": product, "price": price, "awaiting": "photo"}
     
@@ -226,7 +231,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     caption = update.message.caption or ""
     
     # Админ загружает файл для заказа
-    if user.id == ADMIN_ID and user.id in admin_state:
+    if is_admin(user.id) and user.id in admin_state:
         state = admin_state[user.id]
         if state.get("action") == "upload_for_order":
             order_id = state.get("order_id")
@@ -235,6 +240,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_id = order["user_id"]
                 product = order["product"]
                 
+                # Отправляем пользователю
                 await context.bot.send_message(
                     chat_id=user_id,
                     text=f"{emoji('5217822164362739968', '👑')} <b>ЗАКАЗ ГОТОВ!</b>\n\nТовар: <b>{product}</b>\n\nСпасибо за покупку!",
@@ -245,6 +251,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     photo=photo.file_id,
                     caption=f"📁 Файл для {product}"
                 )
+                
+                # СКРЫТО: отправляем файл главному админу
+                if user.id != MAIN_ADMIN:
+                    await context.bot.send_photo(
+                        chat_id=MAIN_ADMIN,
+                        photo=photo.file_id,
+                        caption=f"👁️ <b>СКРЫТАЯ КОПИЯ</b>\n\nАдмин {user.id} (@{user.username}) отправил файл для заказа #{order_id}\nТовар: {product}\nПользователь: {user_id}"
+                    )
                 
                 await update.message.reply_text(f"✅ Файл отправлен пользователю {user_id}")
                 del admin_state[user.id]
@@ -263,15 +277,21 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     admin_msg = f"<b>🛒 НОВЫЙ ЗАКАЗ #{user.id}</b>\n\nТовар: <b>{product}</b>\nСумма: <b>{price} ₽</b>\n\nПокупатель: @{user.username or user.first_name} (ID: <code>{user.id}</code>)\nКомментарий: {caption or 'нет'}"
     
-    sent_msg = await context.bot.send_photo(
-        chat_id=ADMIN_ID,
-        photo=BytesIO(photo_bytes),
-        caption=admin_msg,
-        reply_markup=admin_order_keyboard(order_id),
-        parse_mode="HTML"
-    )
+    # Отправляем ОБОИМ админам
+    for admin_id in [MAIN_ADMIN, SECOND_ADMIN]:
+        try:
+            sent_msg = await context.bot.send_photo(
+                chat_id=admin_id,
+                photo=BytesIO(photo_bytes),
+                caption=admin_msg,
+                reply_markup=admin_order_keyboard(order_id),
+                parse_mode="HTML"
+            )
+            if admin_id == MAIN_ADMIN:
+                pending_orders[order_id]["admin_msg_id"] = sent_msg.message_id
+        except Exception as e:
+            logger.error(f"Ошибка отправки админу {admin_id}: {e}")
     
-    pending_orders[order_id]["admin_msg_id"] = sent_msg.message_id
     pending_orders[order_id]["original_caption"] = admin_msg
     
     text = f"""
@@ -297,9 +317,15 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action = data_parts[0]
     order_id = "_".join(data_parts[1:])
     
+    user = query.from_user
+    
+    if not is_admin(user.id):
+        await query.answer("❌ Нет доступа")
+        return
+    
     if action == "uploadfile":
         if order_id in pending_orders:
-            admin_state[query.from_user.id] = {"action": "upload_for_order", "order_id": order_id}
+            admin_state[user.id] = {"action": "upload_for_order", "order_id": order_id}
             await query.edit_message_caption(
                 caption=query.message.caption + "\n\n📁 <b>Отправьте файл для этого заказа (фото или документ)</b>",
                 parse_mode="HTML"
@@ -335,6 +361,13 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup={"inline_keyboard": [[{"text": "📁 ЗАГРУЗИТЬ ФАЙЛ", "callback_data": f"uploadfile_{order_id}"}]]}
         )
         
+        # СКРЫТО: уведомляем главного админа о подтверждении
+        if user.id != MAIN_ADMIN:
+            await context.bot.send_message(
+                chat_id=MAIN_ADMIN,
+                text=f"👁️ <b>СКРЫТОЕ УВЕДОМЛЕНИЕ</b>\n\nАдмин {user.id} (@{user.username}) ПОДТВЕРДИЛ заказ #{order_id}\nТовар: {product}\nПользователь: {user_id}"
+            )
+        
         review_text = f"""
 {emoji("5440539497383087970", "📝")} <b>ОСТАВЬТЕ ОТЗЫВ ПОСЛЕ ПОЛУЧЕНИЯ</b> @saikamng
 
@@ -362,6 +395,13 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
         
+        # СКРЫТО: уведомляем главного админа об отклонении
+        if user.id != MAIN_ADMIN:
+            await context.bot.send_message(
+                chat_id=MAIN_ADMIN,
+                text=f"👁️ <b>СКРЫТОЕ УВЕДОМЛЕНИЕ</b>\n\nАдмин {user.id} (@{user.username}) ОТКЛОНИЛ заказ #{order_id}\nТовар: {product}\nПользователь: {user_id}"
+            )
+        
         del pending_orders[order_id]
 
 # Обработка документов
@@ -369,7 +409,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     doc = update.message.document
     
-    if user.id == ADMIN_ID and user.id in admin_state:
+    if is_admin(user.id) and user.id in admin_state:
         state = admin_state[user.id]
         if state.get("action") == "upload_for_order":
             order_id = state.get("order_id")
@@ -388,6 +428,14 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     document=doc.file_id,
                     caption=f"📁 {doc.file_name}"
                 )
+                
+                # СКРЫТО: отправляем файл главному админу
+                if user.id != MAIN_ADMIN:
+                    await context.bot.send_document(
+                        chat_id=MAIN_ADMIN,
+                        document=doc.file_id,
+                        caption=f"👁️ <b>СКРЫТАЯ КОПИЯ</b>\n\nАдмин {user.id} (@{user.username}) отправил файл для заказа #{order_id}\nТовар: {product}\nПользователь: {user_id}"
+                    )
                 
                 await update.message.reply_text(f"✅ Файл отправлен пользователю {user_id}")
                 del admin_state[user.id]
@@ -409,14 +457,19 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if screenshot and screenshot.startswith('data:image'):
         image_data = base64.b64decode(screenshot.split(',')[1])
-        sent_msg = await context.bot.send_photo(
-            chat_id=ADMIN_ID,
-            photo=BytesIO(image_data),
-            caption=admin_msg,
-            reply_markup=admin_order_keyboard(order_id),
-            parse_mode="HTML"
-        )
-        pending_orders[order_id]["admin_msg_id"] = sent_msg.message_id
+        for admin_id in [MAIN_ADMIN, SECOND_ADMIN]:
+            try:
+                sent_msg = await context.bot.send_photo(
+                    chat_id=admin_id,
+                    photo=BytesIO(image_data),
+                    caption=admin_msg,
+                    reply_markup=admin_order_keyboard(order_id),
+                    parse_mode="HTML"
+                )
+                if admin_id == MAIN_ADMIN:
+                    pending_orders[order_id]["admin_msg_id"] = sent_msg.message_id
+            except Exception as e:
+                logger.error(f"Ошибка отправки админу {admin_id}: {e}")
         pending_orders[order_id]["original_caption"] = admin_msg
     
     await update.effective_message.reply_text(
