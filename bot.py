@@ -135,8 +135,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Магазин в боте
     elif data == "shop_bot":
+        text = (
+            '<tg-emoji emoji-id="5938413566624272793">🛒</tg-emoji> <b>МАГАЗИН</b>\n\n'
+            '<tg-emoji emoji-id="5350291836378307462">📋</tg-emoji> Выберите категорию:'
+        )
         await query.edit_message_text(
-            "<tg-emoji emoji-id="5938413566624272793">🛒</tg-emoji> <b>МАГАЗИН</b>\n\n<tg-emoji emoji-id="5350291836378307462">📋</tg-emoji> Выберите категорию:",
+            text,
             reply_markup=shop_categories(),
             parse_mode="HTML"
         )
@@ -145,8 +149,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("cat_"):
         category = data.replace("cat_", "")
         titles = {"vpn": "🔒 VPN ДЛЯ PUBG", "extra": "📦 МАГНИТ & ПАКИ", "dns": "🌐 DNS СЕРВИСЫ"}
+        text = f'<tg-emoji emoji-id="5350291836378307462">📋</tg-emoji> <b>{titles[category]}</b>\n\nВыберите товар:'
         await query.edit_message_text(
-            f"<tg-emoji emoji-id='5350291836378307462'>📋</tg-emoji> <b>{titles[category]}</b>\n\nВыберите товар:",
+            text,
             reply_markup=products_keyboard(category),
             parse_mode="HTML"
         )
@@ -186,8 +191,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Кнопка "Я оплатил"
     elif data.startswith("paid_"):
         _, product, price = data.split("_", 2)
-        await query.edit_message_text(
-            f"""
+        text = f"""
 <tg-emoji emoji-id="5217822164362739968">👑</tg-emoji> <b>ЗАГРУЗИТЕ ЧЕК</b>
 
 Товар: <b>{product}</b>
@@ -197,7 +201,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💬 Можете добавить комментарий к фото
 
 <i>Администратор проверит и отправит файлы</i>
-""",
+"""
+        await query.edit_message_text(
+            text,
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("◀️ ОТМЕНА", callback_data="shop_bot")]
