@@ -18,7 +18,6 @@ WEBAPP_URL = "https://saika-app-gamma.vercel.app"
 
 SCREENSHOTS_DIR = "screenshots"
 ORDERS_FILE = "orders_db.json"
-FILES_DB = "files_db.json"
 
 os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
@@ -80,20 +79,8 @@ def save_orders(orders):
     with open(ORDERS_FILE, 'w', encoding='utf-8') as f:
         json.dump(orders, f, ensure_ascii=False, indent=2)
 
-def load_files():
-    if os.path.exists(FILES_DB):
-        with open(FILES_DB, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
-
-def save_files(data):
-    with open(FILES_DB, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
 orders_db = load_orders()
-product_files = load_files()
 user_orders = {}
-admin_state = {}
 pending_orders = {}
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -105,7 +92,7 @@ def emoji(id, char):
 def is_admin(user_id):
     return user_id in [MAIN_ADMIN, SECOND_ADMIN]
 
-# --- КЛАВИАТУРЫ ---
+# --- КЛАВИАТУРЫ С ICON_CUSTOM_EMOJI_ID ---
 def main_menu():
     return {
         "inline_keyboard": [
@@ -150,16 +137,13 @@ def admin_order_keyboard(order_id: str):
     return {
         "inline_keyboard": [
             [
-                {"text": "ПОДТВЕРДИТЬ", "callback_data": f"confirm_{order_id}", "icon_custom_emoji_id": "5310076249404621168"},
-                {"text": "ОТКЛОНИТЬ", "callback_data": f"decline_{order_id}", "icon_custom_emoji_id": "5310169226856644648"}
-            ],
-            [
-                {"text": "ЗАГРУЗИТЬ ФАЙЛ", "callback_data": f"uploadfile_{order_id}", "icon_custom_emoji_id": "5465300082628763143"}
+                {"text": "✅ ПОДТВЕРДИТЬ", "callback_data": f"confirm_{order_id}", "icon_custom_emoji_id": "5310076249404621168"},
+                {"text": "❌ ОТКЛОНИТЬ", "callback_data": f"decline_{order_id}", "icon_custom_emoji_id": "5310169226856644648"}
             ]
         ]
     }
 
-# --- ФУНКЦИИ АВТОВЫДАЧИ ---
+# --- АВТОВЫДАЧА ---
 def download_file(url):
     try:
         response = requests.get(url, timeout=30)
@@ -303,32 +287,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
         await query.edit_message_text(text=profile_text, reply_markup=main_menu(), parse_mode="HTML")
 
-# --- ОБРАБОТКА ФОТО ---
+# --- ОБРАБОТКА ФОТО (ЧЕКИ) ---
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     photo = update.message.photo[-1]
     caption = update.message.caption or ""
-    
-    if is_admin(user.id) and user.id in admin_state:
-        state = admin_state[user.id]
-        if state.get("action") == "upload_for_order":
-            order_id = state.get("order_id")
-            order = next((o for o in orders_db if o['id'] == order_id), None)
-            
-            if order:
-                await context.bot.send_message(
-                    chat_id=order['userId'],
-                    text=f"{emoji('5217822164362739968', '👑')} <b>ЗАКАЗ ГОТОВ!</b>\n\nТовар: <b>{order['product']}</b>",
-                    parse_mode="HTML"
-                )
-                await context.bot.send_photo(
-                    chat_id=order['userId'],
-                    photo=photo.file_id,
-                    caption=f"📁 Файл для {order['product']}"
-                )
-                await update.message.reply_text(f"✅ Файл отправлен пользователю {order['userId']}")
-                del admin_state[user.id]
-                return
     
     order = user_orders.get(user.id, {})
     product = order.get('product', 'Неизвестный товар')
@@ -351,6 +314,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=admin_order_keyboard(order_id),
                 parse_mode="HTML"
             )
+            logger.info(f"✅ Заказ отправлен админу {admin_id}")
         except Exception as e:
             logger.error(f"Ошибка отправки админу {admin_id}: {e}")
     
@@ -383,14 +347,7 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("❌ Нет доступа")
         return
     
-    if action == "uploadfile":
-        if order_id in pending_orders:
-            admin_state[user.id] = {"action": "upload_for_order", "order_id": order_id}
-            await query.edit_message_caption(
-                caption=query.message.caption + "\n\n📁 <b>Отправьте файл для этого заказа</b>",
-                parse_mode="HTML"
-            )
-        return
+    logger.info(f"👑 Админ {user.id} нажал {action} для заказа {order_id}")
     
     if order_id not in pending_orders:
         await query.answer("❌ Заказ не найден")
@@ -422,9 +379,12 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await query.edit_message_caption(
-                caption=query.message.caption + "\n\n⚠️ <b>ПОДТВЕРЖДЕНО, НО ФАЙЛЫ НЕ НАЙДЕНЫ</b>",
-                parse_mode="HTML",
-                reply_markup={"inline_keyboard": [[{"text": "📁 ЗАГРУЗИТЬ ВРУЧНУЮ", "callback_data": f"uploadfile_{order_id}"}]]}
+                caption=query.message.caption + "\n\n❌ <b>ОШИБКА ОТПРАВКИ ФАЙЛОВ</b>",
+                parse_mode="HTML"
+            )
+            await context.bot.send_message(
+                chat_id=MAIN_ADMIN,
+                text=f"❌ Ошибка автовыдачи для заказа {order_id}\nТовар: {product}"
             )
         
         del pending_orders[order_id]
@@ -467,6 +427,9 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
         orders_db.append(new_order)
         save_orders(orders_db)
         
+        pending_order_id = f"{user.id}_{order['product']}_{order['price']}".replace(" ", "_")
+        pending_orders[pending_order_id] = {"user_id": user.id, "product": order['product'], "price": order['price']}
+        
         admin_msg = f"<b>🛒 НОВЫЙ ЗАКАЗ (WEB) #{user.id}</b>\n\nТовар: <b>{order['product']}</b>\nСумма: <b>{order['price']} ₽</b>\nПокупатель: @{user.username or user.first_name} (ID: <code>{user.id}</code>)\nКомментарий: {order.get('comment', 'нет')}"
         
         if order.get('screenshot') and order['screenshot'].startswith('data:image'):
@@ -474,19 +437,25 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 screenshot_data = order['screenshot'].split(',')[1]
                 image_data = base64.b64decode(screenshot_data)
                 
-                order_id_pending = f"{user.id}_{order['product']}_{order['price']}".replace(" ", "_")
-                pending_orders[order_id_pending] = {"user_id": user.id, "product": order['product'], "price": order['price']}
-                
                 for admin_id in [MAIN_ADMIN, SECOND_ADMIN]:
                     await context.bot.send_photo(
                         chat_id=admin_id,
                         photo=BytesIO(image_data),
                         caption=admin_msg,
-                        reply_markup=admin_order_keyboard(order_id_pending),
+                        reply_markup=admin_order_keyboard(pending_order_id),
                         parse_mode="HTML"
                     )
+                    logger.info(f"✅ Заказ отправлен админу {admin_id}")
             except Exception as e:
                 logger.error(f"Ошибка скриншота: {e}")
+        else:
+            for admin_id in [MAIN_ADMIN, SECOND_ADMIN]:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=admin_msg + "\n\n⚠️ Скриншот не прикреплён",
+                    reply_markup=admin_order_keyboard(pending_order_id),
+                    parse_mode="HTML"
+                )
         
         await update.effective_message.reply_text(
             f"{emoji('5217822164362739968', '👑')} <b>ЗАКАЗ ПРИНЯТ!</b>\n\nТовар: {order['product']}\nСумма: {order['price']} ₽\nСтатус: ⏳ ОЖИДАЕТ",
@@ -503,8 +472,8 @@ def main():
     
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler, pattern="^(?!confirm_|decline_|uploadfile_).*"))
-    app.add_handler(CallbackQueryHandler(admin_action, pattern="^(confirm|decline|uploadfile)_"))
+    app.add_handler(CallbackQueryHandler(button_handler, pattern="^(?!confirm_|decline_).*"))
+    app.add_handler(CallbackQueryHandler(admin_action, pattern="^(confirm|decline)_"))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     
