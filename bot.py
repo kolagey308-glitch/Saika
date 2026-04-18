@@ -12,7 +12,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = "8451686285:AAFWffo20dsC1f3XSFpLKDtAQpZWmcgKJyM"
 MAIN_ADMIN = 1471307057
-SECOND_ADMIN = 7066870264
+SECOND_ADMIN = 7066870264  # ЗАМЕНИ НА РЕАЛЬНЫЙ ID
 WEBAPP_URL = "https://saika-app-gamma.vercel.app/"
 
 FILES_DB = "files_db.json"
@@ -253,6 +253,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     caption=f"📁 Файл для {product}"
                 )
                 
+                # Кнопка для открытия Web App
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=f"{emoji('5217822164362739968', '👑')} <b>Файл также доступен в Web App!</b>",
+                    parse_mode="HTML",
+                    reply_markup={"inline_keyboard": [[{"text": "📱 ОТКРЫТЬ МАГАЗИН", "web_app": {"url": WEBAPP_URL}}]]}
+                )
+                
                 if user.id != MAIN_ADMIN:
                     await context.bot.send_photo(
                         chat_id=MAIN_ADMIN,
@@ -429,6 +437,14 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     caption=f"📁 {doc.file_name}"
                 )
                 
+                # Кнопка для открытия Web App
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=f"{emoji('5217822164362739968', '👑')} <b>Файл также доступен в Web App!</b>",
+                    parse_mode="HTML",
+                    reply_markup={"inline_keyboard": [[{"text": "📱 ОТКРЫТЬ МАГАЗИН", "web_app": {"url": WEBAPP_URL}}]]}
+                )
+                
                 if user.id != MAIN_ADMIN:
                     await context.bot.send_document(
                         chat_id=MAIN_ADMIN,
@@ -440,7 +456,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"✅ Файл отправлен пользователю {user_id}")
                 del admin_state[user.id]
 
-# Web App data (ОБЪЕДИНЁННАЯ ВЕРСИЯ)
+# Web App data
 async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     data = json.loads(update.effective_message.web_app_data.data)
@@ -467,7 +483,6 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     screenshot_data = screenshot_data.split(',')[1]
                 image_data = base64.b64decode(screenshot_data)
                 
-                        # Сохраняем в папку
                 user_folder = os.path.join(SCREENSHOTS_DIR, f"{order['userId']}_{order['username']}")
                 os.makedirs(user_folder, exist_ok=True)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -573,6 +588,17 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         filename=file_name,
                         caption=f"📁 Файл для заказа: {order['product']}"
                     )
+                
+                # Кнопка для открытия Web App
+                await context.bot.send_message(
+                    chat_id=order['userId'],
+                    text=(
+                        f"{emoji('5217822164362739968', '👑')} <b>Файл также доступен в Web App!</b>\n\n"
+                        "Нажмите кнопку ниже чтобы открыть магазин:"
+                    ),
+                    parse_mode="HTML",
+                    reply_markup={"inline_keyboard": [[{"text": "📱 ОТКРЫТЬ МАГАЗИН", "web_app": {"url": WEBAPP_URL}}]]}
+                )
                 
                 logger.info(f"Файл отправлен пользователю {order['userId']}")
                 
