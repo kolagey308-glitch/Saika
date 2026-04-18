@@ -56,8 +56,8 @@ CATALOG = {
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ТГ Премиум эмодзи ID
-EMOJI_ID = {
+# TG Premium эмодзи ID
+EMOJI = {
     "crown": "5217822164362739968",
     "fire": "6030445631921721471",
     "shop": "5938413566624272793",
@@ -74,28 +74,28 @@ EMOJI_ID = {
     "card": "5206607081334906820",
     "person": "5879770735999717115",
     "upload": "5465300082628763143",
-    "photo": "5197269100878907942",
     "success": "5310076249404621168",
     "danger": "5310169226856644648",
     "primary": "5285430309720966085"
 }
 
-def em(id): return f'<tg-emoji emoji-id="{id}">...</tg-emoji>'
+def em(id): 
+    return f'<tg-emoji emoji-id="{id}">👍</tg-emoji>'
 
 # --- КЛАВИАТУРЫ СО СТИЛЯМИ ---
 def main_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"{em(EMOJI_ID['shop'])} Магазин", callback_data="shop_bot"),
-         InlineKeyboardButton(f"{em(EMOJI_ID['profile'])} Профиль", callback_data="profile")],
+        [InlineKeyboardButton(f"{em(EMOJI['shop'])} Магазин", callback_data="shop_bot"),
+         InlineKeyboardButton(f"{em(EMOJI['profile'])} Профиль", callback_data="profile")],
         [InlineKeyboardButton("🌐 Web Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]
     ])
 
 def shop_categories():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"{em(EMOJI_ID['vpn'])} VPN ДЛЯ PUBG", callback_data="cat_vpn")],
-        [InlineKeyboardButton(f"{em(EMOJI_ID['magnet'])} МАГНИТ & ПАКИ", callback_data="cat_extra")],
-        [InlineKeyboardButton(f"{em(EMOJI_ID['dns'])} DNS СЕРВИСЫ", callback_data="cat_dns")],
-        [InlineKeyboardButton(f"{em(EMOJI_ID['back'])} НАЗАД", callback_data="back_menu")]
+        [InlineKeyboardButton(f"{em(EMOJI['vpn'])} VPN ДЛЯ PUBG", callback_data="cat_vpn")],
+        [InlineKeyboardButton(f"{em(EMOJI['magnet'])} МАГНИТ & ПАКИ", callback_data="cat_extra")],
+        [InlineKeyboardButton(f"{em(EMOJI['dns'])} DNS СЕРВИСЫ", callback_data="cat_dns")],
+        [InlineKeyboardButton(f"{em(EMOJI['back'])} НАЗАД", callback_data="back_menu")]
     ])
 
 def products_keyboard(category: str):
@@ -104,26 +104,26 @@ def products_keyboard(category: str):
         old_price = f" ❗{item['old']}₽" if item['old'] else ""
         btn_text = f"{item['name']} | {item['price']}₽{old_price} | {item['stock']} шт."
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"buy_{category}_{item['name']}")])
-    keyboard.append([InlineKeyboardButton(f"{em(EMOJI_ID['back'])} К КАТЕГОРИЯМ", callback_data="shop_bot")])
+    keyboard.append([InlineKeyboardButton(f"{em(EMOJI['back'])} К КАТЕГОРИЯМ", callback_data="shop_bot")])
     return InlineKeyboardMarkup(keyboard)
 
 def payment_keyboard(product: str, price: int):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"{em(EMOJI_ID['paid'])} Я ОПЛАТИЛ, ОТПРАВИТЬ ЧЕК", callback_data=f"paid_{product}_{price}")],
-        [InlineKeyboardButton(f"{em(EMOJI_ID['back'])} ВЫБРАТЬ ДРУГОЙ ТОВАР", callback_data="shop_bot")]
+        [InlineKeyboardButton(f"{em(EMOJI['paid'])} Я ОПЛАТИЛ, ОТПРАВИТЬ ЧЕК", callback_data=f"paid_{product}_{price}")],
+        [InlineKeyboardButton(f"{em(EMOJI['back'])} ВЫБРАТЬ ДРУГОЙ ТОВАР", callback_data="shop_bot")]
     ])
 
 def admin_order_keyboard(order_id: str):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ ПОДТВЕРДИТЬ", callback_data=f"confirm_{order_id}", icon_custom_emoji_id=EMOJI_ID['success']),
-         InlineKeyboardButton("❌ ОТКЛОНИТЬ", callback_data=f"decline_{order_id}", icon_custom_emoji_id=EMOJI_ID['danger'])]
+        [InlineKeyboardButton("✅ ПОДТВЕРДИТЬ", callback_data=f"confirm_{order_id}", icon_custom_emoji_id=EMOJI['success']),
+         InlineKeyboardButton("❌ ОТКЛОНИТЬ", callback_data=f"decline_{order_id}", icon_custom_emoji_id=EMOJI['danger'])]
     ])
 
 def admin_panel_keyboard():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"{em(EMOJI_ID['upload'])} ЗАГРУЗИТЬ ФАЙЛЫ ДЛЯ ТОВАРА", callback_data="admin_upload_menu")],
-        [InlineKeyboardButton("📋 СПИСОК ТОВАРОВ С ФАЙЛАМИ", callback_data="admin_list_files")],
-        [InlineKeyboardButton(f"{em(EMOJI_ID['back'])} НАЗАД", callback_data="back_menu")]
+        [InlineKeyboardButton(f"{em(EMOJI['upload'])} ЗАГРУЗИТЬ ФАЙЛЫ", callback_data="admin_upload_menu")],
+        [InlineKeyboardButton("📋 СПИСОК ФАЙЛОВ", callback_data="admin_list_files")],
+        [InlineKeyboardButton(f"{em(EMOJI['back'])} НАЗАД", callback_data="back_menu")]
     ])
 
 def admin_upload_menu_keyboard():
@@ -144,23 +144,23 @@ def admin_upload_menu_keyboard():
     if row:
         keyboard.append(row)
     
-    keyboard.append([InlineKeyboardButton(f"{em(EMOJI_ID['back'])} В АДМИН-ПАНЕЛЬ", callback_data="admin_panel")])
+    keyboard.append([InlineKeyboardButton(f"{em(EMOJI['back'])} В АДМИН-ПАНЕЛЬ", callback_data="admin_panel")])
     return InlineKeyboardMarkup(keyboard)
 
 # --- КОМАНДЫ ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    welcome = f"""
-{em(EMOJI_ID['crown'])} <b>SAIKA PREMIUM STORE</b>
+    welcome = f'''
+{em(EMOJI["crown"])} <b>SAIKA PREMIUM STORE</b>
 
 Привет! Ты находишься в @vpnsaika_bot
 
-{em(EMOJI_ID['fire'])} Качественные впн и многое другое только у нас
+{em(EMOJI["fire"])} Качественные впн и многое другое только у нас
 
-{em(EMOJI_ID['shop'])} <b>Магазин</b> — выбор товаров
-{em(EMOJI_ID['profile'])} <b>Профиль</b> — твои данные
+{em(EMOJI["shop"])} <b>Магазин</b> — выбор товаров
+{em(EMOJI["profile"])} <b>Профиль</b> — твои данные
 
 Выбери действие ниже:
-"""
+'''
     await update.message.reply_text(welcome, reply_markup=main_menu(), parse_mode="HTML")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -171,11 +171,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # АДМИН-ПАНЕЛЬ
     if data == "admin_panel" and user.id == ADMIN_ID:
-        text = f"{em(EMOJI_ID['crown'])} <b>АДМИН-ПАНЕЛЬ</b>\n\nВыберите действие:"
+        text = f"{em(EMOJI['crown'])} <b>АДМИН-ПАНЕЛЬ</b>\n\nВыберите действие:"
         await query.edit_message_text(text, reply_markup=admin_panel_keyboard(), parse_mode="HTML")
     
     elif data == "admin_upload_menu" and user.id == ADMIN_ID:
-        text = f"{em(EMOJI_ID['upload'])} <b>ЗАГРУЗКА ФАЙЛОВ</b>\n\nВыберите товар:\n✅ - файлы загружены\n📁 - файлов нет"
+        text = f"{em(EMOJI['upload'])} <b>ЗАГРУЗКА ФАЙЛОВ</b>\n\nВыберите товар:\n✅ - файлы загружены\n📁 - файлов нет"
         await query.edit_message_text(text, reply_markup=admin_upload_menu_keyboard(), parse_mode="HTML")
     
     elif data == "admin_list_files" and user.id == ADMIN_ID:
@@ -188,7 +188,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not has_files:
             text += "❌ Нет загруженных файлов"
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton(f"{em(EMOJI_ID['back'])} НАЗАД", callback_data="admin_panel")]
+            [InlineKeyboardButton(f"{em(EMOJI['back'])} НАЗАД", callback_data="admin_panel")]
         ]))
     
     elif data.startswith("admin_upload_") and user.id == ADMIN_ID:
@@ -196,7 +196,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         admin_state[user.id] = {"action": "upload", "product": product}
         current_files = len(product_files.get(product, []))
         text = f"""
-{em(EMOJI_ID['upload'])} <b>ЗАГРУЗКА ФАЙЛА</b>
+{em(EMOJI['upload'])} <b>ЗАГРУЗКА ФАЙЛА</b>
 
 Товар: <b>{product}</b>
 
@@ -205,7 +205,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🗑️ ОЧИСТИТЬ ФАЙЛЫ", callback_data=f"admin_clear_{product}")],
-            [InlineKeyboardButton(f"{em(EMOJI_ID['back'])} НАЗАД", callback_data="admin_upload_menu")]
+            [InlineKeyboardButton(f"{em(EMOJI['back'])} НАЗАД", callback_data="admin_upload_menu")]
         ]))
     
     elif data.startswith("admin_clear_") and user.id == ADMIN_ID:
@@ -217,27 +217,27 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             f"✅ Файлы для <b>{product}</b> удалены",
             parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{em(EMOJI_ID['back'])} НАЗАД", callback_data="admin_upload_menu")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{em(EMOJI['back'])} НАЗАД", callback_data="admin_upload_menu")]])
         )
     
     # ОБЫЧНОЕ МЕНЮ
     elif data == "back_menu":
         await query.edit_message_text(
-            f"{em(EMOJI_ID['crown'])} <b>ГЛАВНОЕ МЕНЮ</b>\n\nВыберите раздел:",
+            f"{em(EMOJI['crown'])} <b>ГЛАВНОЕ МЕНЮ</b>\n\nВыберите раздел:",
             reply_markup=main_menu(),
             parse_mode="HTML"
         )
     
     elif data == "shop_bot":
-        text = f'{em(EMOJI_ID["shop"])} <b>МАГАЗИН</b>\n\nВыберите категорию:'
+        text = f"{em(EMOJI['shop'])} <b>МАГАЗИН</b>\n\nВыберите категорию:"
         await query.edit_message_text(text, reply_markup=shop_categories(), parse_mode="HTML")
     
     elif data.startswith("cat_"):
         category = data.replace("cat_", "")
         titles = {
-            "vpn": f"{em(EMOJI_ID['vpn'])} VPN ДЛЯ PUBG", 
-            "extra": f"{em(EMOJI_ID['magnet'])} МАГНИТ & ПАКИ", 
-            "dns": f"{em(EMOJI_ID['dns'])} DNS СЕРВИСЫ"
+            "vpn": f"{em(EMOJI['vpn'])} VPN ДЛЯ PUBG", 
+            "extra": f"{em(EMOJI['magnet'])} МАГНИТ & ПАКИ", 
+            "dns": f"{em(EMOJI['dns'])} DNS СЕРВИСЫ"
         }
         await query.edit_message_text(
             f'<b>{titles[category]}</b>\n\nВыберите товар:',
@@ -253,7 +253,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_orders[user.id] = {"product": product, "price": item['price']}
             old_text = f" ❗{item['old']}₽" if item['old'] else ""
             text = f"""
-{em(EMOJI_ID['crown'])} <b>ОФОРМЛЕНИЕ ЗАКАЗА</b>
+{em(EMOJI['crown'])} <b>ОФОРМЛЕНИЕ ЗАКАЗА</b>
 
 Товар: <b>{product}</b>
 Цена: <b>{item['price']}₽</b>{old_text}
@@ -262,9 +262,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ━━━━━━━━━━━━━━━━━━
 ✍️ <b>РЕКВИЗИТЫ ДЛЯ ОПЛАТЫ:</b>
 
-{em(EMOJI_ID['bank'])} Банк: <b>Т-Банк</b>
-{em(EMOJI_ID['card'])} Карта: <code>2200 7021 4895 7363</code>
-{em(EMOJI_ID['person'])} Получатель: <b>Саид К.</b>
+{em(EMOJI['bank'])} Банк: <b>Т-Банк</b>
+{em(EMOJI['card'])} Карта: <code>2200 7021 4895 7363</code>
+{em(EMOJI['person'])} Получатель: <b>Саид К.</b>
 
 ━━━━━━━━━━━━━━━━━━
 <i>После оплаты нажмите кнопку ниже и загрузите скриншот чека</i>
@@ -286,19 +286,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
         await query.edit_message_text(
             text, parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{em(EMOJI_ID['back'])} ОТМЕНА", callback_data="shop_bot")]])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{em(EMOJI['back'])} ОТМЕНА", callback_data="shop_bot")]])
         )
         user_orders[user.id] = {"product": product, "price": price, "awaiting": "photo"}
     
     elif data == "profile":
         profile_text = f"""
-{em(EMOJI_ID['user_icon'])} <b>ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ</b>
+{em(EMOJI['profile'])} <b>ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ</b>
 
-{em(EMOJI_ID['user_icon'])} Имя: <b>{user.first_name} {user.last_name or ''}</b>
-{em(EMOJI_ID['id_icon'])} ID: <code>{user.id}</code>
-{em(EMOJI_ID['username_icon'])} Username: @{user.username or 'не указан'}
+{em(EMOJI['person'])} Имя: <b>{user.first_name} {user.last_name or ''}</b>
+🆔 ID: <code>{user.id}</code>
+📱 Username: @{user.username or 'не указан'}
 
-{em(EMOJI_ID['status_icon'])} Статус: {em(EMOJI_ID['crown'])} <b>Premium Client</b>
+⭐ Статус: {em(EMOJI['crown'])} <b>Premium Client</b>
 
 Для покупок откройте магазин 👇
 """
@@ -325,10 +325,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         product_files[product].append(file_info)
         save_files(product_files)
         
-        await update.message.reply_text(
-            f"✅ Фото добавлено к товару <b>{product}</b>\nВсего файлов: {len(product_files[product])}",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text(f"✅ Фото добавлено к товару <b>{product}</b>\nВсего файлов: {len(product_files[product])}", parse_mode="HTML")
         return
     
     # Чек от пользователя
@@ -342,15 +339,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     order_id = f"{user.id}_{product}_{price}".replace(" ", "_")
     pending_orders[order_id] = {"user_id": user.id, "product": product, "price": price}
     
-    admin_msg = f"""
-<b>🛒 НОВЫЙ ЗАКАЗ #{user.id}</b>
-
-Товар: <b>{product}</b>
-Сумма: <b>{price} ₽</b>
-
-Покупатель: @{user.username or user.first_name} (ID: <code>{user.id}</code>)
-Комментарий: {caption or 'нет'}
-"""
+    admin_msg = f"<b>🛒 НОВЫЙ ЗАКАЗ #{user.id}</b>\n\nТовар: <b>{product}</b>\nСумма: <b>{price} ₽</b>\n\nПокупатель: @{user.username or user.first_name} (ID: <code>{user.id}</code>)\nКомментарий: {caption or 'нет'}"
     
     await context.bot.send_photo(
         chat_id=ADMIN_ID,
@@ -361,11 +350,11 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     text = f"""
-{em(EMOJI_ID['crown'])} <b>ЧЕК ПОЛУЧЕН!</b>
+{em(EMOJI['crown'])} <b>ЧЕК ПОЛУЧЕН!</b>
 
 Товар: <b>{product}</b>
 Сумма: <b>{price} ₽</b>
-Статус: {em(EMOJI_ID['clock'])} <b>ОЖИДАЕТ ПРОВЕРКИ</b>
+Статус: {em(EMOJI['clock'])} <b>ОЖИДАЕТ ПРОВЕРКИ</b>
 
 ✔️ Администратор проверит оплату и отправит файлы в этот чат.
 ✨ Обычно это занимает 5-15 минут.
@@ -375,7 +364,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user.id in user_orders:
         del user_orders[user.id]
 
-# Обработка документов (для админа)
+# Обработка документов
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
@@ -394,20 +383,15 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         product_files[product].append(file_info)
         save_files(product_files)
         
-        await update.message.reply_text(
-            f"✅ Файл <b>{doc.file_name}</b> добавлен к товару <b>{product}</b>\nВсего файлов: {len(product_files[product])}",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text(f"✅ Файл <b>{doc.file_name}</b> добавлен к товару <b>{product}</b>\nВсего файлов: {len(product_files[product])}", parse_mode="HTML")
 
-# Обработка кнопок админа (ПОДТВЕРДИТЬ/ОТКЛОНИТЬ)
+# Обработка кнопок админа
 async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data_parts = query.data.split("_")
     action = data_parts[0]
     order_id = "_".join(data_parts[1:])
-    
-    logger.info(f"Admin action: {action}, order_id: {order_id}")
     
     if order_id not in pending_orders:
         await query.answer("❌ Заказ не найден")
@@ -421,14 +405,8 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if action == "confirm":
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"""
-{em(EMOJI_ID['crown'])} <b>ОПЛАТА ПОДТВЕРЖДЕНА!</b>
-
-Товар: <b>{product}</b>
-Статус: ✅ <b>УСПЕШНО</b>
-
-Сейчас отправим файлы 👇
-""", parse_mode="HTML"
+            text=f"{em(EMOJI['crown'])} <b>ОПЛАТА ПОДТВЕРЖДЕНА!</b>\n\nТовар: <b>{product}</b>\nСтатус: ✅ <b>УСПЕШНО</b>\n\nСейчас отправим файлы 👇",
+            parse_mode="HTML"
         )
         
         files_sent = 0
@@ -436,60 +414,19 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for file_info in product_files[product]:
                 try:
                     if file_info["type"] == "document":
-                        await context.bot.send_document(
-                            chat_id=user_id,
-                            document=file_info["file_id"],
-                            caption=f"📁 {file_info['file_name']}" if files_sent == 0 else ""
-                        )
+                        await context.bot.send_document(chat_id=user_id, document=file_info["file_id"])
                     else:
-                        await context.bot.send_photo(
-                            chat_id=user_id,
-                            photo=file_info["file_id"],
-                            caption=f"🖼️ Файл для {product}" if files_sent == 0 else ""
-                        )
+                        await context.bot.send_photo(chat_id=user_id, photo=file_info["file_id"])
                     files_sent += 1
                 except Exception as e:
                     logger.error(f"Ошибка отправки: {e}")
         
-        if files_sent == 0:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text="⚠️ Файлы не загружены. Администратор отправит их вручную."
-            )
-        
-        review_text = f"""
-{em(EMOJI_ID['review'])} <b>ОСТАВЬТЕ ОТЗЫВ ПОСЛЕ ПОЛУЧЕНИЯ</b> @saikamng
-
-{em(EMOJI_ID['bad1'])} СЛИЛ ТОВАР
-{em(EMOJI_ID['bad2'])} ИСПОРТИЛ ЕГО И ПОТЕРЯЛ ДЕНЬГИ
-"""
-        await context.bot.send_message(chat_id=user_id, text=review_text, parse_mode="HTML")
-        
-        await query.edit_message_caption(
-            caption=query.message.caption + f"\n\n✅ <b>ПОДТВЕРЖДЕНО</b>\nФайлов отправлено: {files_sent}",
-            parse_mode="HTML"
-        )
-        
+        await query.edit_message_caption(caption=query.message.caption + f"\n\n✅ <b>ПОДТВЕРЖДЕНО</b>", parse_mode="HTML")
         del pending_orders[order_id]
     
     elif action == "decline":
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"""
-{em(EMOJI_ID['cancel'])} <b>ОПЛАТА НЕ ПОДТВЕРЖДЕНА</b>
-
-Товар: <b>{product}</b>
-Сумма: <b>{price} ₽</b>
-
-Проверьте реквизиты или свяжитесь с @saikasupport
-""", parse_mode="HTML"
-        )
-        
-        await query.edit_message_caption(
-            caption=query.message.caption + f"\n\n{em(EMOJI_ID['cancel'])} <b>ОТКЛОНЕНО</b>",
-            parse_mode="HTML"
-        )
-        
+        await context.bot.send_message(chat_id=user_id, text=f"{em(EMOJI['cancel'])} <b>ОПЛАТА НЕ ПОДТВЕРЖДЕНА</b>\n\nПроверьте реквизиты.", parse_mode="HTML")
+        await query.edit_message_caption(caption=query.message.caption + f"\n\n{em(EMOJI['cancel'])} <b>ОТКЛОНЕНО</b>", parse_mode="HTML")
         del pending_orders[order_id]
 
 # Web App data
@@ -509,42 +446,17 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if screenshot and screenshot.startswith('data:image'):
         image_data = base64.b64decode(screenshot.split(',')[1])
-        await context.bot.send_photo(
-            chat_id=ADMIN_ID,
-            photo=BytesIO(image_data),
-            caption=admin_msg,
-            reply_markup=admin_order_keyboard(order_id),
-            parse_mode="HTML"
-        )
-    else:
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=admin_msg,
-            reply_markup=admin_order_keyboard(order_id),
-            parse_mode="HTML"
-        )
+        await context.bot.send_photo(chat_id=ADMIN_ID, photo=BytesIO(image_data), caption=admin_msg, reply_markup=admin_order_keyboard(order_id), parse_mode="HTML")
     
-    await update.effective_message.reply_text(
-        f"{em(EMOJI_ID['crown'])} <b>ЗАКАЗ ПРИНЯТ!</b>\n\nТовар: {product}\nСумма: {price}₽\nСтатус: {em(EMOJI_ID['clock'])} ОЖИДАЕТ",
-        parse_mode="HTML"
-    )
+    await update.effective_message.reply_text(f"{em(EMOJI['crown'])} <b>ЗАКАЗ ПРИНЯТ!</b>\n\nТовар: {product}\nСумма: {price}₽\nСтатус: {em(EMOJI['clock'])} ОЖИДАЕТ", parse_mode="HTML")
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("❌ У вас нет доступа к админ-панели")
         return
-    
-    await update.message.reply_text(
-        f"{em(EMOJI_ID['crown'])} <b>АДМИН-ПАНЕЛЬ</b>\n\nВыберите действие:",
-        reply_markup=admin_panel_keyboard(),
-        parse_mode="HTML"
-    )
+    await update.message.reply_text(f"{em(EMOJI['crown'])} <b>АДМИН-ПАНЕЛЬ</b>", reply_markup=admin_panel_keyboard(), parse_mode="HTML")
 
 def main():
-    print("=== BOT STARTING ===", flush=True)
-    
     app = Application.builder().token(BOT_TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin_command))
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^(?!confirm_|decline_).*"))
@@ -553,7 +465,6 @@ def main():
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     
-    print("=== BOT RUNNING ===", flush=True)
     logger.info("🚀 Бот запущен!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
