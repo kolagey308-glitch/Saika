@@ -66,11 +66,11 @@ def main_menu():
     return {
         "inline_keyboard": [
             [
-                {"text": "🛍️ Магазин", "callback_data": "shop_bot", "icon_custom_emoji_id": "5938413566624272793"},
-                {"text": "👤 Профиль", "callback_data": "profile", "icon_custom_emoji_id": "5879770735999717115"}
+                {"text": " Магазин", "callback_data": "shop_bot", "icon_custom_emoji_id": "5938413566624272793"},
+                {"text": " Профиль", "callback_data": "profile", "icon_custom_emoji_id": "5879770735999717115"}
             ],
             [
-                {"text": "🌐 Web Магазин", "web_app": {"url": WEBAPP_URL}}
+                {"text": " Web Магазин", "web_app": {"url": WEBAPP_URL}}
             ]
         ]
     }
