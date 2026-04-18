@@ -9,9 +9,9 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 # --- НАСТРОЙКИ ---
 BOT_TOKEN = "8507469444:AAGv0ZRhyazsuSdxkkr1eNRi3DTJdc127fw"
 ADMIN_ID = 1471307057
-WEBAPP_URL = "https://твой-сайт.com"  # ЗАМЕНИ НА URL ГДЕ ЛЕЖИТ HTML
+WEBAPP_URL = "https://saika.up.railway.app"  # Твой Railway домен
 
-# База файлов для товаров (замени на реальные пути к файлам)
+# База файлов для товаров
 PRODUCT_FILES = {
     "SAIKA S1 VPN": ["files/saika_s1.ovpn", "files/saika_s1.conf"],
     "VIP VPN": ["files/vip.ovpn"],
@@ -31,6 +31,7 @@ PRODUCT_FILES = {
 }
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # --- КЛАВИАТУРЫ ---
 def main_menu():
@@ -127,7 +128,6 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Отправляем скриншот админу если есть
     if screenshot and screenshot.startswith('data:image'):
         try:
-            # Декодируем base64
             image_data = base64.b64decode(screenshot.split(',')[1])
             image_file = BytesIO(image_data)
             image_file.name = f"check_{user_id}.jpg"
@@ -140,9 +140,10 @@ async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
         except Exception as e:
+            logger.error(f"Ошибка загрузки скрина: {e}")
             await context.bot.send_message(
                 chat_id=ADMIN_ID,
-                text=admin_msg + f"\n\n❌ Ошибка загрузки скрина: {e}",
+                text=admin_msg + f"\n\n❌ Ошибка загрузки скрина",
                 reply_markup=admin_order_keyboard(user_id, product),
                 parse_mode="HTML"
             )
@@ -207,10 +208,7 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             )
                         files_sent += 1
                 except Exception as e:
-                    await context.bot.send_message(
-                        chat_id=user_id,
-                        text=f"❌ Ошибка отправки файла: {e}\nСвяжитесь с поддержкой @saikasupport"
-                    )
+                    logger.error(f"Ошибка отправки файла {file_path}: {e}")
         
         if files_sent == 0:
             await context.bot.send_message(
@@ -271,12 +269,11 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
 
-# Обработка ответа пользователя на уточнение
+# Обработка ответа пользователя
 async def handle_user_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.effective_message.text
     
-    # Пересылаем ответ админу
     await context.bot.send_message(
         chat_id=ADMIN_ID,
         text=f"""
@@ -300,18 +297,22 @@ async def handle_user_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 def main():
+    # Создаем Application
     app = Application.builder().token(BOT_TOKEN).build()
     
+    # Добавляем обработчики
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^(profile|support)$"))
     app.add_handler(CallbackQueryHandler(admin_action, pattern="^(confirm|decline|ask)_"))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_user_reply))
     
-    print("🚀 Бот запущен!")
-    app.run_polling()
+    logger.info("🚀 Бот запущен!")
+    
+    # Запускаем поллинг
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    # Создаем папку для файлов если её нет
+    # Создаем папку для файлов
     os.makedirs("files", exist_ok=True)
     main()
