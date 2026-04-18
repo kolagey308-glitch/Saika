@@ -92,7 +92,7 @@ def emoji(id, char):
 def is_admin(user_id):
     return user_id in [MAIN_ADMIN, SECOND_ADMIN]
 
-# --- КЛАВИАТУРЫ С ICON_CUSTOM_EMOJI_ID ---
+# --- КЛАВИАТУРЫ ---
 def main_menu():
     return {
         "inline_keyboard": [
@@ -287,7 +287,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
         await query.edit_message_text(text=profile_text, reply_markup=main_menu(), parse_mode="HTML")
 
-# --- ОБРАБОТКА ФОТО (ЧЕКИ) ---
+# --- ОБРАБОТКА ФОТО ---
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     photo = update.message.photo[-1]
