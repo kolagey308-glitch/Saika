@@ -3,8 +3,7 @@ import logging
 import base64
 import os
 from io import BytesIO
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-import threading
+import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
@@ -13,9 +12,9 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 BOT_TOKEN = "8507469444:AAGv0ZRhyazsuSdxkkr1eNRi3DTJdc127fw"
 ADMIN_ID = 1471307057
 PORT = int(os.environ.get("PORT", 8000))
-WEBAPP_URL = "https://saika-production.up.railway.app"
+WEBAPP_URL = "https://saika-app-gamma.vercel.app/"  # ЗАМЕНИ НА СВОЙ VERCEL URL
 
-# Хранилище файлов (в памяти + можно сохранять в JSON)
+# Хранилище файлов
 FILES_DB = "files_db.json"
 
 def load_files():
@@ -92,13 +91,6 @@ EMOJI = {
 
 def em(id): return f'<tg-emoji emoji-id="{id}">...</tg-emoji>'
 
-# --- HTTP СЕРВЕР ДЛЯ WEB APP ---
-def run_http_server():
-    handler = SimpleHTTPRequestHandler
-    httpd = HTTPServer(("0.0.0.0", PORT), handler)
-    logger.info(f"🌐 HTTP Server running on port {PORT}")
-    httpd.serve_forever()
-
 # --- КЛАВИАТУРЫ ---
 def main_menu():
     return InlineKeyboardMarkup([
@@ -145,8 +137,8 @@ def admin_panel_keyboard():
     
     keyboard = []
     row = []
-    for i, product in enumerate(all_products):
-        has_file = "✅" if product in product_files else "📁"
+    for product in all_products:
+        has_file = "✅" if product in product_files and product_files[product] else "📁"
         row.append(InlineKeyboardButton(f"{has_file} {product[:15]}", callback_data=f"admin_upload_{product}"))
         if len(row) == 2:
             keyboard.append(row)
@@ -154,7 +146,6 @@ def admin_panel_keyboard():
     if row:
         keyboard.append(row)
     
-    keyboard.append([InlineKeyboardButton("📋 СПИСОК ЗАКАЗОВ", callback_data="admin_orders")])
     keyboard.append([InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data="admin_panel")])
     return InlineKeyboardMarkup(keyboard)
 
@@ -173,12 +164,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 Выбери действие ниже:
 """
     await update.message.reply_text(welcome, reply_markup=main_menu(), parse_mode="HTML")
+    logger.info(f"User {update.effective_user.id} started bot")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
     user = query.from_user
+    
+    logger.info(f"Button: {data} from {user.id}")
     
     # АДМИН-ПАНЕЛЬ
     if data == "admin_panel" and user.id == ADMIN_ID:
@@ -211,13 +205,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer(f"Файлы для {product} удалены")
         await query.edit_message_text(
             f"✅ Файлы для {product} удалены",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{em(EMOJI['back'])} НАЗАД", callback_data="admin_panel")]])
-        )
-    
-    elif data == "admin_orders" and user.id == ADMIN_ID:
-        await query.edit_message_text(
-            "📋 <b>Заказы ожидают обработки в чате</b>\n\nИспользуйте кнопки под заказами.",
-            parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{em(EMOJI['back'])} НАЗАД", callback_data="admin_panel")]])
         )
     
@@ -305,17 +292,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
         await query.edit_message_text(profile_text, reply_markup=main_menu(), parse_mode="HTML")
 
-# Обработка фото (чеков)
+# Обработка фото
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     photo = update.message.photo[-1]
     caption = update.message.caption or ""
     
-    # Проверка админа (загрузка файла для товара)
+    logger.info(f"Photo from {user.id}")
+    
+    # Админ загружает файл
     if user.id == ADMIN_ID and user.id in admin_state and admin_state[user.id].get("action") == "upload":
         product = admin_state[user.id]["product"]
-        file = await context.bot.get_file(photo.file_id)
-        file_bytes = await file.download_as_bytearray()
         
         if product not in product_files:
             product_files[product] = []
@@ -334,7 +321,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # Обычный чек от пользователя
+    # Чек от пользователя
     order = user_orders.get(user.id, {})
     product = order.get('product', 'Неизвестный товар')
     price = order.get('price', '?')
@@ -377,7 +364,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user.id in user_orders:
         del user_orders[user.id]
 
-# Обработка документов (загрузка файлов админом)
+# Обработка документов
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
@@ -407,6 +394,8 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data.split("_")
     action = data[0]
+    
+    logger.info(f"Admin action: {action}")
     
     if action == "confirm":
         user_id = int(data[1])
@@ -450,7 +439,6 @@ async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text="⚠️ Файлы не загружены. Администратор отправит их вручную."
             )
         
-        # Отзыв
         review_text = f"""
 {em(EMOJI['review'])} <b>ОСТАВЬТЕ ОТЗЫВ ПОСЛЕ ПОЛУЧЕНИЯ</b> @saikamng
 
@@ -548,8 +536,8 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 def main():
-    # Запуск HTTP сервера в фоне
-    threading.Thread(target=run_http_server, daemon=True).start()
+    # Удаляем HTTP сервер - он не нужен!
+    # Бот работает только как поллинг
     
     app = Application.builder().token(BOT_TOKEN).build()
     
@@ -562,7 +550,7 @@ def main():
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
-    logger.info("🚀 Бот + HTTP сервер запущены!")
+    logger.info("🚀 Бот запущен!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
