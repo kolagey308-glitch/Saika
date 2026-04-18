@@ -97,9 +97,8 @@ def main_menu():
     return {
         "inline_keyboard": [
             [
-
-                [{"text": "Магазин", "callback_data": "shop_bot", "icon_custom_emoji_id": "5294298833071674944"}],
-                [{"text": "Профиль", "callback_data": "profile", "icon_custom_emoji_id": "5294298833071674944"}]
+                {"text": f"{emoji('5938413566624272793', '🛒')} Магазин", "callback_data": "shop_bot", "icon_custom_emoji_id": "5938413566624272793"},
+                {"text": f"{emoji('5879770735999717115', '👤')} Профиль", "callback_data": "profile", "icon_custom_emoji_id": "5879770735999717115"}
             ],
             [
                 {"text": "🌐 Web Магазин", "web_app": {"url": WEBAPP_URL}}
