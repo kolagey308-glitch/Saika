@@ -5,7 +5,6 @@ import os
 import asyncio
 from io import BytesIO
 from datetime import datetime
-import requests
 
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
@@ -40,28 +39,28 @@ PRODUCT_FILES = {
     "Пак сайки": {"url": "https://www.icloud.com/shortcuts/83963f23bcc94e7a85bbbe0c6a56e350", "name": "Saika_Pack", "is_link": True}
 }
 
-# --- КАТАЛОГ ТОВАРОВ ---
+# --- КАТАЛОГ ТОВАРОВ (НОРМАЛЬНЫЕ ЦЕНЫ БЕЗ СКИДОК) ---
 CATALOG = {
     "vpn": [
-        {"name": "SAIKA S1 VPN", "price": 79, "old": 1199, "stock": "9"},
-        {"name": "VIP VPN", "price": 79, "old": 529, "stock": "10"},
-        {"name": "GTR VPN", "price": 79, "old": 899, "stock": "∞"},
-        {"name": "ULTRA MAX VPN", "price": 79, "old": 629, "stock": "8"},
-        {"name": "STRONG VPN", "price": 79, "old": 499, "stock": "∞"},
-        {"name": "UNLY VPN", "price": 79, "old": 399, "stock": "∞"},
-        {"name": "TDM SKILL VPN", "price": 79, "old": 199, "stock": "∞"},
-        {"name": "FUCK VPN", "price": 49, "old": 139, "stock": "∞"},
-        {"name": "DEAD ALL VPN", "price": 79, "old": 1299, "stock": "∞"}
+        {"name": "SAIKA S1 VPN", "price": 1199, "old": None, "stock": "9"},
+        {"name": "VIP VPN", "price": 529, "old": None, "stock": "10"},
+        {"name": "GTR VPN", "price": 899, "old": None, "stock": "∞"},
+        {"name": "ULTRA MAX VPN", "price": 629, "old": None, "stock": "8"},
+        {"name": "STRONG VPN", "price": 499, "old": None, "stock": "∞"},
+        {"name": "UNLY VPN", "price": 399, "old": None, "stock": "∞"},
+        {"name": "TDM SKILL VPN", "price": 199, "old": None, "stock": "∞"},
+        {"name": "FUCK VPN", "price": 139, "old": None, "stock": "∞"},
+        {"name": "DEAD ALL VPN", "price": 1299, "old": None, "stock": "∞"}
     ],
     "extra": [
-        {"name": "Магнит андроид", "price": 169, "old": 259, "stock": "∞"},
+        {"name": "Магнит андроид", "price": 259, "old": None, "stock": "∞"},
         {"name": "Магнит ios", "price": 269, "old": None, "stock": "∞"},
-        {"name": "Пак сайки", "price": 639, "old": 1789, "stock": "∞"},
-        {"name": "Пак unly", "price": 79, "old": 1299, "stock": "10"}
+        {"name": "Пак сайки", "price": 1789, "old": None, "stock": "∞"},
+        {"name": "Пак unly", "price": 1299, "old": None, "stock": "10"}
     ],
     "dns": [
-        {"name": "DNS android", "price": 129, "old": 239, "stock": "∞"},
-        {"name": "DNS Ios", "price": 129, "old": 239, "stock": "∞"}
+        {"name": "DNS android", "price": 239, "old": None, "stock": "∞"},
+        {"name": "DNS Ios", "price": 239, "old": None, "stock": "∞"}
     ]
 }
 
@@ -105,8 +104,7 @@ def shop_categories():
 def products_keyboard(category: str):
     keyboard = []
     for item in CATALOG[category]:
-        old_price = f" ❗{item['old']}₽" if item['old'] else ""
-        btn_text = f"{item['name']} | {item['price']}₽{old_price} | {item['stock']} шт."
+        btn_text = f"{item['name']} | {item['price']}₽ | {item['stock']} шт."
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"buy_{category}_{item['name']}")])
     keyboard.append([InlineKeyboardButton("◀️ К КАТЕГОРИЯМ", callback_data="shop_bot")])
     return InlineKeyboardMarkup(keyboard)
@@ -124,7 +122,6 @@ def admin_order_keyboard(order_id: str):
     ])
 
 def download_keyboard(file_url: str, file_name: str):
-    """Кнопка для скачивания файла"""
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(f"📥 СКАЧАТЬ {file_name}", url=file_url)]
     ])
@@ -209,12 +206,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if item:
             user_orders[user.id] = {"product": product, "price": item['price']}
-            old_text = f" ❗{item['old']}₽" if item['old'] else ""
             text = f"""
 👑 <b>ОФОРМЛЕНИЕ ЗАКАЗА</b>
 
 Товар: <b>{product}</b>
-Цена: <b>{item['price']}₽</b>{old_text}
+Цена: <b>{item['price']}₽</b>
 В наличии: {item['stock']} шт.
 
 ━━━━━━━━━━━━━━━━━━
