@@ -1,418 +1,454 @@
-import json
-import logging
-import base64
-import os
 import asyncio
-from io import BytesIO
-from datetime import datetime
+import json
+import os
+from datetime import datetime, timedelta
+from typing import Dict, Optional
 
-from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command, StateFilter
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-# --- НАСТРОЙКИ ---
-BOT_TOKEN = "8451686285:AAFWffo20dsC1f3XSFpLKDtAQpZWmcgKJyM"
-MAIN_ADMIN = 1471307057
-SECOND_ADMIN = 7066870264
-WEBAPP_URL = "https://saika-app-gamma.vercel.app"
+# ========== КОНФИГУРАЦИЯ ==========
+BOT_TOKEN = "8743517612:AAFrgMXZpRnDQclyuiRYNKSziV-TPhkB_S8"
+ADMIN_ID = 7496589494
+CRYPTO_BOT_TOKEN = "560372:AAyQpvWZFSHpzrnVAhVwPF7PbcJmqI7bH0K"  # Твой токен CryptoPay
+UAH_CARD = "4441111008011946"
+UAH_COMMENT = "За цифрові товари"
 
-SCREENSHOTS_DIR = "screenshots"
-ORDERS_FILE = "orders_db.json"
-
-os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
-
-# --- АВТОВЫДАЧА ТОВАРОВ (ФАЙЛЫ) ---
-PRODUCT_FILES = {
-    "GTR VPN": {"url": "https://files.catbox.moe/cwy1n3.conf", "name": "GTR_VPN.conf"},
-    "VIP VPN": {"url": "https://files.catbox.moe/ab8a1r.conf", "name": "VIP_VPN.conf"},
-    "ULTRA MAX VPN": {"url": "https://files.catbox.moe/rqbq5r.conf", "name": "ULTRA_MAX.conf"},
-    "STRONG VPN": {"url": "https://files.catbox.moe/e6a8yh.conf", "name": "STRONG_VPN.conf"},
-    "SAIKA S1 VPN": {"url": "https://files.catbox.moe/1coq6u.conf", "name": "SAIKA_S1.conf"},
-    "DEAD ALL VPN": {"url": "https://files.catbox.moe/ohvc5d.conf", "name": "DEAD_ALL.conf"},
-    "TDM SKILL VPN": {"url": "https://files.catbox.moe/ohvc5d.conf", "name": "TDM_SKILL.conf"},
-    "FUCK VPN": {"url": "https://files.catbox.moe/3ghk4a.conf", "name": "FUCK_VPN.conf"},
-    "UNLY VPN": {"url": "https://files.catbox.moe/5qcb3b.conf", "name": "UNLY_VPN.conf"},
-    "Магнит андроид": {"url": "https://files.catbox.moe/qahmjb.zip", "name": "Magnet_Android.zip"},
-    "Магнит ios": {"url": "https://files.catbox.moe/ql2d0s.mobileconfig", "name": "DNS_iOS.mobileconfig"},
-    "Пак unly": {"url": "https://files.catbox.moe/qahmjb.zip", "name": "Unly_Pack.zip"},
-    "DNS android": {"url": "https://files.catbox.moe/ql2d0s.mobileconfig", "name": "DNS_Android.mobileconfig"},
-    "DNS Ios": {"url": "https://files.catbox.moe/ql2d0s.mobileconfig", "name": "DNS_iOS.mobileconfig"},
-    "Пак сайки": {"url": "https://www.icloud.com/shortcuts/83963f23bcc94e7a85bbbe0c6a56e350", "name": "Saika_Pack", "is_link": True}
+# Цены (USDT и UAH)
+PRICES = {
+    "Lebro [Lite]": {"24h": 1.5, "7d": 4.5},
+    "Lebro [VIP]": {"24h": 3, "7d": 7.5, "30d": 15},
+    "Plutonium": {"7d": 150, "30d": 300, "90d": 700},
 }
 
-# --- КАТАЛОГ ТОВАРОВ (НОРМАЛЬНЫЕ ЦЕНЫ БЕЗ СКИДОК) ---
-CATALOG = {
-    "vpn": [
-        {"name": "SAIKA S1 VPN", "price": 1199, "old": None, "stock": "9"},
-        {"name": "VIP VPN", "price": 529, "old": None, "stock": "10"},
-        {"name": "GTR VPN", "price": 899, "old": None, "stock": "∞"},
-        {"name": "ULTRA MAX VPN", "price": 629, "old": None, "stock": "8"},
-        {"name": "STRONG VPN", "price": 499, "old": None, "stock": "∞"},
-        {"name": "UNLY VPN", "price": 399, "old": None, "stock": "∞"},
-        {"name": "TDM SKILL VPN", "price": 199, "old": None, "stock": "∞"},
-        {"name": "FUCK VPN", "price": 139, "old": None, "stock": "∞"},
-        {"name": "DEAD ALL VPN", "price": 1299, "old": None, "stock": "∞"}
-    ],
-    "extra": [
-        {"name": "Магнит андроид", "price": 259, "old": None, "stock": "∞"},
-        {"name": "Магнит ios", "price": 269, "old": None, "stock": "∞"},
-        {"name": "Пак сайки", "price": 1789, "old": None, "stock": "∞"},
-        {"name": "Пак unly", "price": 1299, "old": None, "stock": "10"}
-    ],
-    "dns": [
-        {"name": "DNS android", "price": 239, "old": None, "stock": "∞"},
-        {"name": "DNS Ios", "price": 239, "old": None, "stock": "∞"}
-    ]
+# Периоды для отображения
+PERIODS = {
+    "Lebro [Lite]": [("24 часа", "24h"), ("7 дней", "7d")],
+    "Lebro [VIP]": [("24 часа", "24h"), ("7 дней", "7d"), ("30 дней", "30d")],
+    "Plutonium": [("7 дней", "7d"), ("30 дней", "30d"), ("90 дней", "90d")],
 }
 
-# --- БАЗА ДАННЫХ ---
-def load_orders():
-    if os.path.exists(ORDERS_FILE):
-        with open(ORDERS_FILE, 'r', encoding='utf-8') as f:
+# ========== ХРАНЕНИЕ ДАННЫХ ==========
+DATA_FILE = "bot_data.json"
+
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return []
+    return {"users": {}, "pending_uah": {}}
 
-def save_orders(orders):
-    with open(ORDERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(orders, f, ensure_ascii=False, indent=2)
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
-orders_db = load_orders()
-user_orders = {}
-pending_orders = {}
+data = load_data()
 
-logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
-logger = logging.getLogger(__name__)
+# ========== FSM СОСТОЯНИЯ ==========
+class AgreementState(StatesGroup):
+    waiting_agreement = State()
 
-def is_admin(user_id):
-    return user_id in [MAIN_ADMIN, SECOND_ADMIN]
+class PaymentState(StatesGroup):
+    waiting_game = State()
+    waiting_product = State()
+    waiting_period = State()
+    waiting_payment_method = State()
+    waiting_uah_receipt = State()
 
-# --- КЛАВИАТУРЫ ---
-def main_menu():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛍️ Магазин", callback_data="shop_bot"),
-         InlineKeyboardButton("👤 Профиль", callback_data="profile")],
-        [InlineKeyboardButton("🌐 Web Магазин", web_app={"url": WEBAPP_URL})]
+class AdminState(StatesGroup):
+    waiting_user_id_for_keys = State()
+    waiting_key_input = State()
+    waiting_pending_approval = State()
+
+# ========== КЛАВИАТУРЫ ==========
+def get_agreement_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Ознакомлен", callback_data="agree")]
     ])
 
-def shop_categories():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔒 VPN ДЛЯ PUBG", callback_data="cat_vpn")],
-        [InlineKeyboardButton("📦 МАГНИТ & ПАКИ", callback_data="cat_extra")],
-        [InlineKeyboardButton("🌐 DNS СЕРВИСЫ", callback_data="cat_dns")],
-        [InlineKeyboardButton("◀️ НАЗАД", callback_data="back_menu")]
-    ])
+def get_main_keyboard(is_admin=False):
+    buttons = [
+        [KeyboardButton(text="🛍 Каталог")],
+        [KeyboardButton(text="👤 Профиль"), KeyboardButton(text="📦 Мои покупки")]
+    ]
+    if is_admin:
+        buttons.append([KeyboardButton(text="🔑 Админ: Выдать ключ")])
+        buttons.append([KeyboardButton(text="💰 Админ: Подтвердить UAH")])
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
-def products_keyboard(category: str):
-    keyboard = []
-    for item in CATALOG[category]:
-        btn_text = f"{item['name']} | {item['price']}₽ | {item['stock']} шт."
-        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"buy_{category}_{item['name']}")])
-    keyboard.append([InlineKeyboardButton("◀️ К КАТЕГОРИЯМ", callback_data="shop_bot")])
-    return InlineKeyboardMarkup(keyboard)
+def get_catalog_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔥 Oxide Survival Island", callback_data="game_oxide")
+    builder.button(text="💥 Standoff 2", callback_data="game_standoff")
+    builder.adjust(1)
+    return builder.as_markup()
 
-def payment_keyboard(product: str, price: int):
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("💳 Я ОПЛАТИЛ, ОТПРАВИТЬ ЧЕК", callback_data=f"paid_{product}_{price}")],
-        [InlineKeyboardButton("◀️ ВЫБРАТЬ ДРУГОЙ ТОВАР", callback_data="shop_bot")]
-    ])
+def get_products_keyboard(game):
+    builder = InlineKeyboardBuilder()
+    if game == "oxide":
+        builder.button(text="Lebro [VIP]", callback_data="product_Lebro [VIP]")
+        builder.button(text="Lebro [Lite]", callback_data="product_Lebro [Lite]")
+    else:
+        builder.button(text="Plutonium", callback_data="product_Plutonium")
+    builder.button(text="🔙 Назад", callback_data="back_to_catalog")
+    builder.adjust(1)
+    return builder.as_markup()
 
-def admin_order_keyboard(order_id: str):
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ ПОДТВЕРДИТЬ", callback_data=f"confirm_{order_id}"),
-         InlineKeyboardButton("❌ ОТКЛОНИТЬ", callback_data=f"decline_{order_id}")]
-    ])
+def get_periods_keyboard(product):
+    builder = InlineKeyboardBuilder()
+    for period_name, period_key in PERIODS[product]:
+        builder.button(text=period_name, callback_data=f"period_{period_key}")
+    builder.button(text="🔙 Назад", callback_data="back_to_products")
+    builder.adjust(1)
+    return builder.as_markup()
 
-def download_keyboard(file_url: str, file_name: str):
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"📥 СКАЧАТЬ {file_name}", url=file_url)]
-    ])
+def get_payment_methods_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="💸 CryptoPay (USDT)", callback_data="pay_crypto")
+    builder.button(text="🇺🇦 Оплата гривной (карта)", callback_data="pay_uah")
+    builder.button(text="🔙 Назад", callback_data="back_to_periods")
+    builder.adjust(1)
+    return builder.as_markup()
 
-# --- АВТОВЫДАЧА С КНОПКОЙ СКАЧАТЬ ---
-async def auto_send_product(bot, user_id, product_name):
-    logger.info(f"🚀 Автовыдача для {user_id}: {product_name}")
-    
-    if product_name in PRODUCT_FILES:
-        file_info = PRODUCT_FILES[product_name]
-        
-        if file_info.get("is_link"):
-            await bot.send_message(
-                chat_id=user_id,
-                text=f"✅ <b>ЗАКАЗ ГОТОВ!</b>\n\nТовар: <b>{product_name}</b>\n\nНажмите кнопку ниже чтобы скачать:",
-                parse_mode="HTML",
-                reply_markup=download_keyboard(file_info["url"], file_info["name"])
-            )
-        else:
-            await bot.send_message(
-                chat_id=user_id,
-                text=f"✅ <b>ЗАКАЗ ГОТОВ!</b>\n\nТовар: <b>{product_name}</b>\n\nНажмите кнопку ниже чтобы скачать файл:",
-                parse_mode="HTML",
-                reply_markup=download_keyboard(file_info["url"], file_info["name"])
-            )
-        
-        await bot.send_message(
-            chat_id=user_id,
-            text="📝 <b>ОСТАВЬТЕ ОТЗЫВ</b> @saikamng\n\n💔 СЛИЛ ТОВАР\n😡 ИСПОРТИЛ ЕГО И ПОТЕРЯЛ ДЕНЬГИ",
-            parse_mode="HTML"
-        )
-        return True
-    
-    logger.warning(f"⚠️ Товар {product_name} не найден")
-    return False
-
-# --- КОМАНДЫ ---
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    welcome = '''
-👑 <b>SAIKA PREMIUM STORE</b>
-
-Привет! Ты находишься в @vpnsaika_bot
-
-🔥 Качественные впн и многое другое только у нас
-
-🛍️ <b>Магазин</b> — выбор товаров
-👤 <b>Профиль</b> — твои данные
-
-Выбери действие ниже:
-'''
-    await update.message.reply_text(text=welcome, reply_markup=main_menu(), parse_mode="HTML")
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data
-    user = query.from_user
-    
-    if data == "back_menu":
-        await query.edit_message_text(
-            text="👑 <b>ГЛАВНОЕ МЕНЮ</b>\n\nВыберите раздел:",
-            reply_markup=main_menu(),
-            parse_mode="HTML"
-        )
-    
-    elif data == "shop_bot":
-        text = "🛍️ <b>МАГАЗИН</b>\n\n📋 Выберите категорию:"
-        await query.edit_message_text(text=text, reply_markup=shop_categories(), parse_mode="HTML")
-    
-    elif data.startswith("cat_"):
-        category = data.replace("cat_", "")
-        titles = {"vpn": "🔒 VPN ДЛЯ PUBG", "extra": "📦 МАГНИТ & ПАКИ", "dns": "🌐 DNS СЕРВИСЫ"}
-        await query.edit_message_text(
-            text=f'📋 <b>{titles[category]}</b>\n\nВыберите товар:',
-            reply_markup=products_keyboard(category),
-            parse_mode="HTML"
-        )
-    
-    elif data.startswith("buy_"):
-        _, category, product = data.split("_", 2)
-        item = next((x for x in CATALOG[category] if x['name'] == product), None)
-        
-        if item:
-            user_orders[user.id] = {"product": product, "price": item['price']}
-            text = f"""
-👑 <b>ОФОРМЛЕНИЕ ЗАКАЗА</b>
-
-Товар: <b>{product}</b>
-Цена: <b>{item['price']}₽</b>
-В наличии: {item['stock']} шт.
-
-━━━━━━━━━━━━━━━━━━
-✍️ <b>РЕКВИЗИТЫ ДЛЯ ОПЛАТЫ:</b>
-
-😀 Банк: <b>Т-Банк</b>
-👛 Карта: <code>2200 7021 4895 7363</code>
-👤 Получатель: <b>Саид К.</b>
-
-━━━━━━━━━━━━━━━━━━
-<i>После оплаты нажмите кнопку ниже и загрузите скриншот чека</i>
-"""
-            await query.edit_message_text(text=text, reply_markup=payment_keyboard(product, item['price']), parse_mode="HTML")
-    
-    elif data.startswith("paid_"):
-        _, product, price = data.split("_", 2)
-        text = f"""
-😀 <b>ЗАГРУЗИТЕ ЧЕК</b>
-
-Товар: <b>{product}</b>
-Сумма: <b>{price}₽</b>
-
-📸 Отправьте скриншот оплаты <b>ПРЯМО В ЭТОТ ЧАТ</b>
-💬 Можете добавить комментарий к фото
-
-<i>Администратор проверит и отправит файлы</i>
-"""
-        await query.edit_message_text(
-            text=text, parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("◀️ ОТМЕНА", callback_data="shop_bot")]])
-        )
-        user_orders[user.id] = {"product": product, "price": price, "awaiting": "photo"}
-    
-    elif data == "profile":
-        profile_text = f"""
-👤 <b>ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ</b>
-
-👤 Имя: <b>{user.first_name} {user.last_name or ''}</b>
-🆔 ID: <code>{user.id}</code>
-📱 Username: @{user.username or 'не указан'}
-
-⭐ Статус: 👑 <b>Premium Client</b>
-
-Для покупок откройте магазин 👇
-"""
-        await query.edit_message_text(text=profile_text, reply_markup=main_menu(), parse_mode="HTML")
-
-# --- ОБРАБОТКА ФОТО ---
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    photo = update.message.photo[-1]
-    caption = update.message.caption or ""
-    
-    order = user_orders.get(user.id, {})
-    product = order.get('product', 'Неизвестный товар')
-    price = order.get('price', '?')
-    
-    file = await context.bot.get_file(photo.file_id)
-    photo_bytes = await file.download_as_bytearray()
-    
-    order_id = f"{user.id}_{product}_{price}".replace(" ", "_")
-    pending_orders[order_id] = {"user_id": user.id, "product": product, "price": price}
-    
-    admin_msg = f"<b>🛒 НОВЫЙ ЗАКАЗ #{user.id}</b>\n\nТовар: <b>{product}</b>\nСумма: <b>{price} ₽</b>\n\nПокупатель: @{user.username or user.first_name} (ID: <code>{user.id}</code>)\nКомментарий: {caption or 'нет'}"
-    
-    for admin_id in [MAIN_ADMIN, SECOND_ADMIN]:
-        try:
-            await context.bot.send_photo(
-                chat_id=admin_id,
-                photo=BytesIO(photo_bytes),
-                caption=admin_msg,
-                reply_markup=admin_order_keyboard(order_id),
-                parse_mode="HTML"
-            )
-        except Exception as e:
-            logger.error(f"Ошибка отправки админу {admin_id}: {e}")
-    
-    await update.message.reply_text(
-        f"👑 <b>ЧЕК ПОЛУЧЕН!</b>\n\nТовар: <b>{product}</b>\nСумма: <b>{price} ₽</b>\nСтатус: ⏳ <b>ОЖИДАЕТ ПРОВЕРКИ</b>\n\n✔️ Администратор проверит оплату и отправит файлы.",
-        parse_mode="HTML", reply_markup=main_menu()
-    )
-    
-    if user.id in user_orders:
-        del user_orders[user.id]
-
-# --- ОБРАБОТКА КНОПОК АДМИНА ---
-async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data_parts = query.data.split("_")
-    action = data_parts[0]
-    order_id = "_".join(data_parts[1:])
-    
-    user = query.from_user
-    
-    if not is_admin(user.id):
-        await query.answer("❌ Нет доступа")
-        return
-    
-    if order_id not in pending_orders:
-        await query.answer("❌ Заказ не найден")
-        return
-    
-    order = pending_orders[order_id]
-    user_id = order["user_id"]
-    product = order["product"]
-    price = order["price"]
-    
-    if action == "confirm":
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"✅ <b>ОПЛАТА ПОДТВЕРЖДЕНА!</b>\n\nТовар: <b>{product}</b>",
-            parse_mode="HTML"
-        )
-        
-        success = await auto_send_product(context.bot, user_id, product)
-        
-        if success:
-            await query.edit_message_caption(
-                caption=query.message.caption + "\n\n✅ <b>ПОДТВЕРЖДЕНО И ОТПРАВЛЕНО</b>",
-                parse_mode="HTML"
-            )
-        else:
-            await query.edit_message_caption(
-                caption=query.message.caption + "\n\n❌ <b>ОШИБКА ОТПРАВКИ</b>",
-                parse_mode="HTML"
-            )
-        
-        del pending_orders[order_id]
-    
-    elif action == "decline":
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"❌ <b>ОПЛАТА НЕ ПОДТВЕРЖДЕНА</b>\n\nТовар: {product}\nСумма: {price} ₽",
-            parse_mode="HTML"
-        )
-        await query.edit_message_caption(
-            caption=query.message.caption + "\n\n❌ <b>ОТКЛОНЕНО</b>",
-            parse_mode="HTML"
-        )
-        del pending_orders[order_id]
-
-# --- WEB APP DATA ---
-async def web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    data = json.loads(update.effective_message.web_app_data.data)
-    
-    action = data.get('action')
-    
-    if action == 'new_order':
-        order = data.get('order')
-        order_id = f"{user.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        
-        new_order = {
-            "id": order_id, "userId": user.id, "username": user.username or user.first_name,
-            "product": order['product'], "price": order['price'],
-            "comment": order.get('comment', ''), "status": "pending",
-            "timestamp": datetime.now().isoformat()
+# ========== ФУНКЦИИ ДЛЯ РАБОТЫ С ПОЛЬЗОВАТЕЛЯМИ ==========
+def register_user(user_id, username, full_name):
+    if str(user_id) not in data["users"]:
+        data["users"][str(user_id)] = {
+            "user_id": user_id,
+            "username": username,
+            "full_name": full_name,
+            "active_key": None,
+            "expires_at": None,
+            "purchases": [],
+            "agreed": False
         }
-        orders_db.append(new_order)
-        save_orders(orders_db)
-        
-        pending_order_id = f"{user.id}_{order['product']}_{order['price']}".replace(" ", "_")
-        pending_orders[pending_order_id] = {"user_id": user.id, "product": order['product'], "price": order['price']}
-        
-        admin_msg = f"<b>🛒 НОВЫЙ ЗАКАЗ (WEB) #{user.id}</b>\n\nТовар: <b>{order['product']}</b>\nСумма: <b>{order['price']} ₽</b>\nПокупатель: @{user.username or user.first_name} (ID: <code>{user.id}</code>)"
-        
-        if order.get('screenshot') and order['screenshot'].startswith('data:image'):
-            try:
-                screenshot_data = order['screenshot'].split(',')[1]
-                image_data = base64.b64decode(screenshot_data)
-                for admin_id in [MAIN_ADMIN, SECOND_ADMIN]:
-                    await context.bot.send_photo(
-                        chat_id=admin_id, photo=BytesIO(image_data),
-                        caption=admin_msg, reply_markup=admin_order_keyboard(pending_order_id),
-                        parse_mode="HTML"
-                    )
-            except Exception as e:
-                logger.error(f"Ошибка скриншота: {e}")
-        
-        await update.effective_message.reply_text(
-            f"👑 <b>ЗАКАЗ ПРИНЯТ!</b>\n\nТовар: {order['product']}\nСумма: {order['price']} ₽\nСтатус: ⏳ ОЖИДАЕТ",
-            parse_mode="HTML"
-        )
+        save_data(data)
 
-async def cleanup_webhook():
-    bot = Bot(token=BOT_TOKEN)
-    await bot.delete_webhook(drop_pending_updates=True)
-    print("✅ Webhook deleted")
+def add_purchase(user_id, product, period, price, currency, key=None, status="pending"):
+    purchase = {
+        "product": product,
+        "period": period,
+        "price": price,
+        "currency": currency,
+        "purchased_at": datetime.now().isoformat(),
+        "status": status,
+        "key": key
+    }
+    data["users"][str(user_id)]["purchases"].append(purchase)
+    if status == "active" and key:
+        data["users"][str(user_id)]["active_key"] = key
+        expires = datetime.now() + timedelta(days=int(period.replace("d", ""))) if period.endswith("d") else datetime.now() + timedelta(hours=24)
+        data["users"][str(user_id)]["expires_at"] = expires.isoformat()
+    save_data(data)
 
-def main():
-    asyncio.run(cleanup_webhook())
+# ========== ХЭНДЛЕРЫ ==========
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher(storage=MemoryStorage())
+
+# Старт + проверка согласия
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message, state: FSMContext):
+    user = message.from_user
+    register_user(user.id, user.username, user.full_name)
     
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler, pattern="^(?!confirm_|decline_).*"))
-    app.add_handler(CallbackQueryHandler(admin_action, pattern="^(confirm|decline)_"))
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    if not data["users"][str(user.id)].get("agreed", False):
+        rules_text = """📜 *Правила PlayCheatGameBot* 
+
+🚫 1. Возврат:
+Возврата нет — при покупке цифрового товара потеря, неправильное использование никто не компенсирует.
+
+⚠️ 2. Ответственность:
+Исполнитель не несёт ответственности за последствия применения.
+
+📜 3. Общие:
+Оплачивая услугу, вы соглашаетесь с данными правилами.
+
+🛡 4. Заключительные:
+Исполнитель вправе изменять условия.
+
+✅ Нажми *Ознакомлен* чтобы продолжить"""
+        await message.answer(rules_text, parse_mode="Markdown", reply_markup=get_agreement_keyboard())
+        await state.set_state(AgreementState.waiting_agreement)
+    else:
+        await show_menu(message)
+
+@dp.callback_query(F.data == "agree", StateFilter(AgreementState.waiting_agreement))
+async def agree_rules(callback: types.CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    data["users"][str(user_id)]["agreed"] = True
+    save_data(data)
+    await callback.message.delete()
+    await callback.message.answer("✅ Добро пожаловать! Теперь ты можешь пользоваться ботом.", reply_markup=get_main_keyboard(user_id == ADMIN_ID))
+    await show_menu(callback.message)
+    await state.clear()
+
+async def show_menu(message: types.Message):
+    text = """🛡 *PlayCheatGameBot* - Надёжный магазин читов для игр!
+
+✅ *Почему мы?*
+• Моментальная автоматическая выдача
+• 24/7 поддержка
+• Проверенные софты без Root
+• Анонимная оплата криптой
+
+*Выбери действие:*"""
+    await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(message.from_user.id == ADMIN_ID))
+
+# Каталог
+@dp.message(F.text == "🛍 Каталог")
+async def catalog(message: types.Message):
+    text = "📋 *Выбери игру:*"
+    await message.answer(text, parse_mode="Markdown", reply_markup=get_catalog_keyboard())
+
+@dp.callback_query(F.data.startswith("game_"))
+async def select_game(callback: types.CallbackQuery, state: FSMContext):
+    game = callback.data.split("_")[1]
+    await state.update_data(game=game)
+    text = "🎮 *Выбери продукт:*"
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_products_keyboard(game))
+
+@dp.callback_query(F.data.startswith("product_"))
+async def select_product(callback: types.CallbackQuery, state: FSMContext):
+    product = callback.data.replace("product_", "")
+    await state.update_data(product=product)
+    text = f"📦 *{product}*\nВыбери период:"
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_periods_keyboard(product))
+
+@dp.callback_query(F.data.startswith("period_"))
+async def select_period(callback: types.CallbackQuery, state: FSMContext):
+    period = callback.data.replace("period_", "")
+    await state.update_data(period=period)
+    data_state = await state.get_data()
+    product = data_state["product"]
     
-    logger.info("🚀 Бот запущен!")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    price = PRICES[product][period]
+    currency = "USDT" if "Lebro" in product else "UAH"
+    
+    text = f"""💸 *К оплате:* {price} {currency}
+
+Подтверди способ оплаты:"""
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=get_payment_methods_keyboard())
+
+@dp.callback_query(F.data == "pay_crypto")
+async def pay_crypto(callback: types.CallbackQuery, state: FSMContext):
+    data_state = await state.get_data()
+    product = data_state["product"]
+    period = data_state["period"]
+    price = PRICES[product][period]
+    
+    # Здесь интеграция с CryptoPay API
+    # В демо-версии просто имитация
+    invoice_link = f"https://t.me/send?start={CRYPTO_BOT_TOKEN}_{int(price*100)}"
+    text = f"""💳 *Оплата через CryptoPay*
+
+Сумма: {price} USDT
+Товар: {product} ({period})
+
+👉 [Оплатить]({invoice_link})
+
+После оплаты чек придет автоматически, и ключ будет выдан."""
+    await callback.message.edit_text(text, parse_mode="Markdown", disable_web_page_preview=True)
+    # Имитация успешной оплаты (в реальности нужен webhook от CryptoPay)
+    # Для демо выдаем ключ от админа
+    await callback.message.answer("⚠️ В демо-режиме оплата не проходит. Напиши админу для теста.")
+    # Реальная интеграция требует вебхук
+
+@dp.callback_query(F.data == "pay_uah")
+async def pay_uah(callback: types.CallbackQuery, state: FSMContext):
+    data_state = await state.get_data()
+    product = data_state["product"]
+    period = data_state["period"]
+    price = PRICES[product][period]
+    
+    text = f"""🇺🇦 *Оплата гривной*
+
+Сумма: {price} грн
+Товар: {product} ({period})
+
+💳 Карта: `{UAH_CARD}`
+❗ Обязательно комментарий: `{UAH_COMMENT}`
+
+После оплаты отправь скриншот чека сюда ⬇️"""
+    await callback.message.edit_text(text, parse_mode="Markdown")
+    await state.set_state(PaymentState.waiting_uah_receipt)
+    await state.update_data(price=price, product=product, period=period)
+
+@dp.message(PaymentState.waiting_uah_receipt, F.photo)
+async def receive_receipt(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    data_state = await state.get_data()
+    photo_id = message.photo[-1].file_id
+    
+    pending_id = f"{user_id}_{datetime.now().timestamp()}"
+    data["pending_uah"][pending_id] = {
+        "user_id": user_id,
+        "product": data_state["product"],
+        "period": data_state["period"],
+        "price": data_state["price"],
+        "photo": photo_id,
+        "username": message.from_user.username
+    }
+    save_data(data)
+    
+    # Уведомление админу
+    admin_text = f"""🔔 *Новая оплата UAH*
+
+👤 Пользователь: @{message.from_user.username} (ID: {user_id})
+📦 Товар: {data_state['product']} ({data_state['period']})
+💰 Сумма: {data_state['price']} грн
+
+Чек прикреплен ниже.
+Используй кнопку *Админ: Подтвердить UAH* для выдачи ключа."""
+    await bot.send_photo(ADMIN_ID, photo_id, caption=admin_text, parse_mode="Markdown")
+    
+    await message.answer("✅ Чек отправлен администратору. Ожидайте выдачи ключа.")
+    await state.clear()
+
+# Профиль
+@dp.message(F.text == "👤 Профиль")
+async def profile(message: types.Message):
+    user = data["users"][str(message.from_user.id)]
+    active = user.get("active_key")
+    expires = user.get("expires_at")
+    
+    text = f"""👤 *Ваш профиль*
+
+🆔 ID: {user['user_id']}
+📛 Юзернейм: @{user['username']}
+🔑 Активный ключ: {active if active else 'Нет'}
+⏳ Срок до: {expires if expires else '—'}"""
+    await message.answer(text, parse_mode="Markdown")
+
+# Мои покупки
+@dp.message(F.text == "📦 Мои покупки")
+async def my_purchases(message: types.Message):
+    purchases = data["users"][str(message.from_user.id)].get("purchases", [])
+    if not purchases:
+        await message.answer("📭 У вас пока нет покупок.")
+        return
+    
+    text = "📜 *История покупок:*\n\n"
+    for p in purchases:
+        text += f"🔹 {p['product']} ({p['period']}) - {p['price']} {p['currency']}\n   Статус: {p['status']}\n   Ключ: {p.get('key', '—')}\n\n"
+    await message.answer(text, parse_mode="Markdown")
+
+# Админ: выдать ключ
+@dp.message(F.text == "🔑 Админ: Выдать ключ")
+async def admin_give_key(message: types.Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        return
+    await message.answer("✏️ Введи ID пользователя, которому выдать ключ:")
+    await state.set_state(AdminState.waiting_user_id_for_keys)
+
+@dp.message(AdminState.waiting_user_id_for_keys)
+async def get_user_id_for_key(message: types.Message, state: FSMContext):
+    try:
+        user_id = int(message.text.strip())
+        if str(user_id) not in data["users"]:
+            await message.answer("❌ Пользователь не найден.")
+            await state.clear()
+            return
+        await state.update_data(target_user=user_id)
+        await message.answer("🔑 Введи ключ (или текст, который выдать пользователю):")
+        await state.set_state(AdminState.waiting_key_input)
+    except:
+        await message.answer("❌ Введи корректный ID (число).")
+
+@dp.message(AdminState.waiting_key_input)
+async def give_key(message: types.Message, state: FSMContext):
+    key = message.text
+    data_state = await state.get_data()
+    user_id = data_state["target_user"]
+    
+    # Активируем ключ пользователю
+    data["users"][str(user_id)]["active_key"] = key
+    data["users"][str(user_id)]["expires_at"] = (datetime.now() + timedelta(days=30)).isoformat()
+    # Добавляем в покупки
+    add_purchase(user_id, "Выдано админом", "30d", 0, "ADMIN", key=key, status="active")
+    save_data(data)
+    
+    await bot.send_message(user_id, f"✅ Администратор выдал вам ключ:\n`{key}`\n\nСпасибо за покупку!", parse_mode="Markdown")
+    await message.answer(f"✅ Ключ выдан пользователю {user_id}")
+    await state.clear()
+
+# Админ: подтвердить UAH
+@dp.message(F.text == "💰 Админ: Подтвердить UAH")
+async def admin_confirm_uah(message: types.Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        return
+    if not data["pending_uah"]:
+        await message.answer("📭 Нет ожидающих подтверждений.")
+        return
+    
+    text = "📋 *Выбери оплату для подтверждения:*\n"
+    buttons = []
+    for pid, info in data["pending_uah"].items():
+        text += f"\n🔹 ID: {pid}\n   От: @{info['username']}\n   Товар: {info['product']} ({info['period']})\n"
+        buttons.append([InlineKeyboardButton(text=f"Выдать @{info['username']}", callback_data=f"approve_{pid}")])
+    
+    await message.answer(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons))
+
+@dp.callback_query(F.data.startswith("approve_"))
+async def approve_uah(callback: types.CallbackQuery, state: FSMContext):
+    pending_id = callback.data.replace("approve_", "")
+    pending = data["pending_uah"].get(pending_id)
+    if not pending:
+        await callback.answer("Уже обработано!", show_alert=True)
+        return
+    
+    user_id = pending["user_id"]
+    product = pending["product"]
+    period = pending["period"]
+    
+    # Выдаем ключ (здесь ты можешь ввести ключ вручную)
+    await callback.message.answer(f"✏️ Введи ключ для пользователя @{pending['username']} (товар {product}):")
+    await state.update_data(target_user=user_id, product=product, period=period, pending_id=pending_id)
+    await state.set_state(AdminState.waiting_pending_approval)
+
+@dp.message(AdminState.waiting_pending_approval)
+async def finish_uah_approval(message: types.Message, state: FSMContext):
+    key = message.text
+    data_state = await state.get_data()
+    user_id = data_state["target_user"]
+    product = data_state["product"]
+    period = data_state["period"]
+    pending_id = data_state["pending_id"]
+    
+    # Добавляем покупку
+    price = PRICES[product][period]
+    add_purchase(user_id, product, period, price, "UAH", key=key, status="active")
+    
+    # Удаляем из pending
+    del data["pending_uah"][pending_id]
+    save_data(data)
+    
+    await bot.send_message(user_id, f"✅ Ваша оплата подтверждена!\n🔑 Ваш ключ: `{key}`\n📦 Товар: {product} ({period})", parse_mode="Markdown")
+    await message.answer(f"✅ Ключ выдан пользователю {user_id}")
+    await state.clear()
+
+# Навигация назад
+@dp.callback_query(F.data == "back_to_catalog")
+async def back_to_catalog(callback: types.CallbackQuery):
+    await callback.message.edit_text("📋 *Выбери игру:*", parse_mode="Markdown", reply_markup=get_catalog_keyboard())
+
+@dp.callback_query(F.data == "back_to_products")
+async def back_to_products(callback: types.CallbackQuery, state: FSMContext):
+    data_state = await state.get_data()
+    game = data_state.get("game", "oxide")
+    await callback.message.edit_text("🎮 *Выбери продукт:*", parse_mode="Markdown", reply_markup=get_products_keyboard(game))
+
+@dp.callback_query(F.data == "back_to_periods")
+async def back_to_periods(callback: types.CallbackQuery, state: FSMContext):
+    data_state = await state.get_data()
+    product = data_state["product"]
+    await callback.message.edit_text(f"📦 *{product}*\nВыбери период:", parse_mode="Markdown", reply_markup=get_periods_keyboard(product))
+
+async def main():
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
