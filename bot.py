@@ -1,16 +1,20 @@
 import asyncio
 import json
 import os
+import hashlib
+import hmac
+import aiohttp
 from datetime import datetime, timedelta
-from typing import Dict, Optional
+from typing import Optional, Dict
 import random
+import time
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # ========== КОНФИГ ==========
@@ -20,7 +24,7 @@ CRYPTO_BOT_TOKEN = "560372:AAyQpvWZFSHpzrnVAhVwPF7PbcJmqI7bH0K"
 UAH_CARD = "4441111008011946"
 UAH_COMMENT = "За цифрові товари"
 
-# Фото для меню
+# Фото
 MENU_PHOTO = "https://files.catbox.moe/vz52pd.png"
 CATALOG_PHOTO = "https://files.catbox.moe/w1ruj1.png"
 GAME_SELECT_PHOTO = "https://files.catbox.moe/kxk5w3.png"
@@ -28,6 +32,7 @@ SYSTEM_PHOTO = "https://files.catbox.moe/87qpck.png"
 PERIOD_PHOTO = "https://files.catbox.moe/b795ua.png"
 PAYMENT_PHOTO = "https://files.catbox.moe/tzogel.png"
 
+# Цены и товары
 PRICES = {
     "Lebro_Lite": {"24h": 1.5, "7d": 4.5},
     "Lebro_VIP": {"24h": 3, "7d": 7.5, "30d": 15},
@@ -53,7 +58,12 @@ def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"users": {}, "pending_uah": {}, "temp_keys": {}}
+    return {
+        "users": {}, 
+        "pending_uah": {}, 
+        "pending_crypto": {},
+        "temp_invoices": {}
+    }
 
 def save_data():
     with open(DATA_FILE, "w", encoding="utf-8") as f:
@@ -64,14 +74,20 @@ data = load_data()
 # ========== FSM ==========
 class States(StatesGroup):
     waiting_agreement = State()
+    # Каталог
     selecting_game = State()
     selecting_product = State()
     selecting_period = State()
     selecting_payment = State()
+    # UAH оплата
     waiting_uah_receipt = State()
+    # Крипто оплата
+    waiting_crypto_payment = State()
+    # Админ
     admin_waiting_user_id = State()
     admin_waiting_key = State()
-    admin_waiting_manual_key = State()
+    admin_waiting_crypto_key = State()
+    admin_waiting_uah_key = State()
 
 # ========== КЛАВИАТУРЫ ==========
 
@@ -85,8 +101,7 @@ def main_menu_keyboard():
     builder.button(text="🛍 Каталог", callback_data="menu_catalog")
     builder.button(text="👤 Профиль", callback_data="menu_profile")
     builder.button(text="📦 Мои покупки", callback_data="menu_purchases")
-    if is_admin:
-        builder.button(text="🔧 Админ-панель", callback_data="menu_admin")
+    builder.button(text="🔧 Админ-панель", callback_data="menu_admin")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -94,6 +109,7 @@ def admin_panel_keyboard():
     builder = InlineKeyboardBuilder()
     builder.button(text="🔑 Выдать ключ пользователю", callback_data="admin_give_key")
     builder.button(text="💰 Подтвердить UAH оплату", callback_data="admin_confirm_uah")
+    builder.button(text="💎 Подтвердить CRYPTO оплату", callback_data="admin_confirm_crypto")
     builder.button(text="🔙 В главное меню", callback_data="back_to_main")
     builder.adjust(1)
     return builder.as_markup()
@@ -109,8 +125,8 @@ def catalog_keyboard():
 def products_keyboard(game):
     builder = InlineKeyboardBuilder()
     if game == "oxide":
-        builder.button(text="Lebro [VIP] (VIP доступ)", callback_data="product_Lebro_VIP")
-        builder.button(text="Lebro [Lite] (Лайт доступ)", callback_data="product_Lebro_Lite")
+        builder.button(text="Lebro [VIP]", callback_data="product_Lebro_VIP")
+        builder.button(text="Lebro [Lite]", callback_data="product_Lebro_Lite")
     else:
         builder.button(text="Plutonium", callback_data="product_Plutonium")
     builder.button(text="🔙 Назад к играм", callback_data="back_to_catalog")
@@ -127,16 +143,73 @@ def periods_keyboard(product):
 
 def payment_keyboard():
     builder = InlineKeyboardBuilder()
-    builder.button(text="💸 CryptoPay (USDT - авто)", callback_data="pay_crypto")
-    builder.button(text="🇺🇦 Оплата гривной (карта)", callback_data="pay_uah")
+    builder.button(text="💸 CryptoPay (USDT)", callback_data="pay_crypto")
+    builder.button(text="🇺🇦 Оплата гривной", callback_data="pay_uah")
     builder.button(text="🔙 Назад к периодам", callback_data="back_to_periods")
     builder.adjust(1)
     return builder.as_markup()
+
+def check_payment_keyboard(invoice_id):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Проверить оплату", callback_data=f"check_payment_{invoice_id}")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_payment")]
+    ])
 
 def cancel_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")]
     ])
+
+# ========== CRYPTOPAY API ==========
+
+class CryptoPayAPI:
+    def __init__(self, token):
+        self.token = token
+        self.base_url = "https://pay.crypt.bot/api"
+    
+    async def create_invoice(self, amount: float, currency: str = "USDT", description: str = "") -> Optional[Dict]:
+        """Создание счета в CryptoPay"""
+        url = f"{self.base_url}/createInvoice"
+        params = {
+            "asset": currency,
+            "amount": str(amount),
+            "description": description[:100]
+        }
+        headers = {
+            "Crypto-Pay-API-Token": self.token
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, headers=headers) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        if result.get("ok"):
+                            return result["result"]
+                    return None
+        except Exception as e:
+            print(f"CryptoPay error: {e}")
+            return None
+    
+    async def check_invoice(self, invoice_id) -> Optional[Dict]:
+        """Проверка статуса счета"""
+        url = f"{self.base_url}/getInvoices"
+        params = {"invoice_ids": invoice_id}
+        headers = {"Crypto-Pay-API-Token": self.token}
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, headers=headers) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        if result.get("ok") and result["result"].get("items"):
+                            return result["result"]["items"][0]
+                    return None
+        except Exception as e:
+            print(f"Check invoice error: {e}")
+            return None
+
+crypto_api = CryptoPayAPI(CRYPTO_BOT_TOKEN)
 
 # ========== ФУНКЦИИ ==========
 
@@ -154,50 +227,52 @@ def register_user(user_id, username, full_name):
         }
         save_data()
 
-def add_purchase(user_id, product_name, period, price, currency, key, status="active"):
+def add_purchase(user_id, product_name, period, price, currency, key, status="pending"):
     purchase = {
         "product": product_name,
         "period": period,
         "price": price,
         "currency": currency,
-        "key": key,
+        "key": key if key else "Ожидает выдачи",
         "purchased_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "status": status
     }
     data["users"][str(user_id)]["purchases"].append(purchase)
     
-    if status == "active":
+    if status == "active" and key:
         data["users"][str(user_id)]["active_key"] = key
         data["users"][str(user_id)]["active_product"] = product_name
         
-        days = 0
-        if period == "24h":
-            days = 1
-        elif period == "7d":
-            days = 7
-        elif period == "30d":
-            days = 30
-        elif period == "90d":
-            days = 90
-        
+        days = 1 if period == "24h" else int(period.replace("d", ""))
         expires = datetime.now() + timedelta(days=days)
         data["users"][str(user_id)]["expires_at"] = expires.strftime("%Y-%m-%d %H:%M:%S")
     
     save_data()
 
-def generate_demo_key():
-    return f"DEMO-{random.randint(100000, 999999)}"
+def activate_key(user_id, key, product_name, period):
+    """Активация ключа для пользователя"""
+    data["users"][str(user_id)]["active_key"] = key
+    data["users"][str(user_id)]["active_product"] = product_name
+    
+    days = 1 if period == "24h" else int(period.replace("d", ""))
+    expires = datetime.now() + timedelta(days=days)
+    data["users"][str(user_id)]["expires_at"] = expires.strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Обновляем последнюю покупку
+    for purchase in reversed(data["users"][str(user_id)]["purchases"]):
+        if purchase["product"] == product_name and purchase["period"] == period and purchase["status"] == "pending":
+            purchase["status"] = "active"
+            purchase["key"] = key
+            break
+    
+    save_data()
 
 # ========== БОТ ==========
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
-# Глобальная проверка админа
-is_admin = False
-
 async def send_with_photo(chat_id, photo_url, caption, keyboard=None):
-    """Отправка сообщения с фото"""
     await bot.send_photo(
         chat_id=chat_id,
         photo=photo_url,
@@ -206,12 +281,11 @@ async def send_with_photo(chat_id, photo_url, caption, keyboard=None):
         reply_markup=keyboard
     )
 
-# ========== ХЭНДЛЕРЫ ==========
+# ========== ОСНОВНЫЕ ХЭНДЛЕРЫ ==========
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
-    global is_admin
-    is_admin = (message.from_user.id == ADMIN_ID)
+    await state.clear()
     register_user(message.from_user.id, message.from_user.username, message.from_user.full_name)
     
     if not data["users"][str(message.from_user.id)]["agreed"]:
@@ -252,9 +326,10 @@ async def show_main_menu(chat_id):
 *Выберите действие:*"""
     await send_with_photo(chat_id, MENU_PHOTO, text, main_menu_keyboard())
 
-# Каталог
+# КАТАЛОГ
 @dp.callback_query(F.data == "menu_catalog")
 async def menu_catalog(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
     text = "📋 *Выберите игру:*"
     await send_with_photo(callback.message.chat.id, CATALOG_PHOTO, text, catalog_keyboard())
     await callback.answer()
@@ -298,6 +373,8 @@ async def select_period(callback: types.CallbackQuery, state: FSMContext):
     await send_with_photo(callback.message.chat.id, PAYMENT_PHOTO, text, payment_keyboard())
     await callback.answer()
 
+# ========== CRYPTO ОПЛАТА ==========
+
 @dp.callback_query(F.data == "pay_crypto")
 async def pay_crypto(callback: types.CallbackQuery, state: FSMContext):
     data_state = await state.get_data()
@@ -306,24 +383,125 @@ async def pay_crypto(callback: types.CallbackQuery, state: FSMContext):
     product_name = PRODUCT_NAMES[product]
     price = PRICES[product][period]
     
-    # Демо-симуляция автовыдачи
-    demo_key = generate_demo_key()
+    # Создаем инвойс в CryptoPay
+    invoice = await crypto_api.create_invoice(price, "USDT", f"{product_name} {period}")
     
-    # Добавляем покупку
-    add_purchase(callback.from_user.id, product_name, period, price, "USDT", demo_key)
+    if not invoice:
+        await callback.message.edit_caption(
+            caption="❌ Ошибка создания счета. Попробуйте позже.",
+            reply_markup=payment_keyboard()
+        )
+        await callback.answer()
+        return
     
-    text = f"""✅ *Оплата прошла успешно!*
+    invoice_id = invoice["invoice_id"]
+    pay_url = invoice["pay_url"]
+    
+    # Сохраняем информацию
+    data["pending_crypto"][str(invoice_id)] = {
+        "user_id": callback.from_user.id,
+        "product": product,
+        "period": period,
+        "product_name": product_name,
+        "price": price,
+        "created_at": time.time()
+    }
+    data["temp_invoices"][str(invoice_id)] = {
+        "user_id": callback.from_user.id,
+        "product": product,
+        "period": period,
+        "product_name": product_name,
+        "price": price
+    }
+    save_data()
+    
+    text = f"""💸 *Создан счет на оплату*
 
-📦 Товар: {product_name}
-⏱ Период: {period}
-🔑 *Ваш ключ:* `{demo_key}`
+💰 Сумма: {price} USDT
+📦 Товар: {product_name} ({period})
 
-❗ В демо-режиме ключ выдан автоматически.
-В реальном режиме CryptoPay выдаст ключ после подтверждения оплаты."""
+🔗 *Ссылка для оплаты:* [Оплатить]({pay_url})
+
+🔄 После оплаты нажмите кнопку ниже для проверки"""
     
-    await callback.message.edit_caption(caption=text, parse_mode="Markdown")
-    await callback.answer("✅ Ключ выдан!", show_alert=True)
+    await callback.message.edit_caption(
+        caption=text, 
+        parse_mode="Markdown",
+        reply_markup=check_payment_keyboard(invoice_id)
+    )
+    await state.update_data(crypto_invoice_id=invoice_id)
+    await state.set_state(States.waiting_crypto_payment)
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("check_payment_"))
+async def check_payment(callback: types.CallbackQuery, state: FSMContext):
+    invoice_id = int(callback.data.replace("check_payment_", ""))
+    
+    invoice_info = data["temp_invoices"].get(str(invoice_id))
+    if not invoice_info:
+        await callback.answer("❌ Счет не найден", show_alert=True)
+        return
+    
+    # Проверяем статус
+    invoice = await crypto_api.check_invoice(invoice_id)
+    
+    if not invoice:
+        await callback.answer("❌ Ошибка проверки", show_alert=True)
+        return
+    
+    status = invoice.get("status")
+    
+    if status == "paid":
+        # Оплата прошла, отправляем админу на подтверждение
+        user_id = invoice_info["user_id"]
+        
+        # Добавляем в pending на выдачу ключа
+        pending_id = f"crypto_{invoice_id}"
+        data["pending_crypto"][pending_id] = {
+            "user_id": user_id,
+            "product": invoice_info["product"],
+            "period": invoice_info["period"],
+            "product_name": invoice_info["product_name"],
+            "price": invoice_info["price"],
+            "invoice_id": invoice_id
+        }
+        save_data()
+        
+        text = f"""✅ *Оплата подтверждена!*
+
+💰 Сумма: {invoice_info['price']} USDT оплачена
+📦 Товар: {invoice_info['product_name']} ({invoice_info['period']})
+
+⏳ Ожидайте выдачи ключа от администратора...
+Администратор уже уведомлен."""
+        
+        await callback.message.edit_caption(caption=text, parse_mode="Markdown")
+        
+        # Уведомляем админа
+        await bot.send_message(
+            ADMIN_ID,
+            f"🔔 *НОВАЯ CRYPTO ОПЛАТА*\n\n"
+            f"👤 Пользователь: @{callback.from_user.username or 'Нет'} (ID: {user_id})\n"
+            f"📦 Товар: {invoice_info['product_name']} ({invoice_info['period']})\n"
+            f"💰 Сумма: {invoice_info['price']} USDT\n"
+            f"🆔 Invoice: {invoice_id}\n\n"
+            f"Используйте *Админ-панель → Подтвердить CRYPTO оплату* для выдачи ключа",
+            parse_mode="Markdown"
+        )
+        
+        await state.clear()
+    elif status == "expired":
+        await callback.answer("❌ Счет просрочен. Создайте новый.", show_alert=True)
+    else:
+        await callback.answer(f"⏳ Статус: {status}. Оплата не обнаружена", show_alert=True)
+
+@dp.callback_query(F.data == "cancel_payment")
+async def cancel_payment(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
+    await show_main_menu(callback.message.chat.id)
+    await callback.answer("Оплата отменена")
+
+# ========== UAH ОПЛАТА ==========
 
 @dp.callback_query(F.data == "pay_uah")
 async def pay_uah(callback: types.CallbackQuery, state: FSMContext):
@@ -357,7 +535,7 @@ async def receive_uah_receipt(message: types.Message, state: FSMContext):
     photo_id = message.photo[-1].file_id
     user_id = message.from_user.id
     
-    pending_id = f"{user_id}_{int(datetime.now().timestamp())}"
+    pending_id = f"uah_{user_id}_{int(datetime.now().timestamp())}"
     data["pending_uah"][pending_id] = {
         "user_id": user_id,
         "product": data_state["uah_product_name"],
@@ -370,7 +548,6 @@ async def receive_uah_receipt(message: types.Message, state: FSMContext):
     }
     save_data()
     
-    # Уведомление админу
     admin_text = f"""🔔 *НОВАЯ ОПЛАТА UAH*
 
 👤 Пользователь: @{message.from_user.username or 'Нет'} (ID: {user_id})
@@ -385,7 +562,8 @@ async def receive_uah_receipt(message: types.Message, state: FSMContext):
     await message.answer("✅ Чек отправлен! Администратор выдаст ключ после проверки.")
     await state.clear()
 
-# Профиль
+# ========== ПРОФИЛЬ И ПОКУПКИ ==========
+
 @dp.callback_query(F.data == "menu_profile")
 async def menu_profile(callback: types.CallbackQuery):
     user = data["users"][str(callback.from_user.id)]
@@ -402,13 +580,11 @@ async def menu_profile(callback: types.CallbackQuery):
 
 🔑 *Активный ключ:* `{active}`
 📦 *Товар:* {product}
-⏳ *Срок до:* {expires}
-
-Используйте ключ в приложении для активации."""
+⏳ *Срок до:* {expires}"""
+    
     await callback.message.edit_caption(caption=text, parse_mode="Markdown", reply_markup=main_menu_keyboard())
     await callback.answer()
 
-# Мои покупки
 @dp.callback_query(F.data == "menu_purchases")
 async def menu_purchases(callback: types.CallbackQuery):
     purchases = data["users"][str(callback.from_user.id)].get("purchases", [])
@@ -417,8 +593,9 @@ async def menu_purchases(callback: types.CallbackQuery):
         text = "📭 *У вас пока нет покупок*\n\nИспользуйте Каталог для приобретения читов."
     else:
         text = "📜 *ИСТОРИЯ ПОКУПОК:*\n\n"
-        for i, p in enumerate(reversed(purchases[-5:]), 1):
-            text += f"{i}. *{p['product']}*\n"
+        for i, p in enumerate(reversed(purchases[-10:]), 1):
+            status_emoji = "✅" if p['status'] == 'active' else "⏳"
+            text += f"{i}. {status_emoji} *{p['product']}*\n"
             text += f"   Период: {p['period']}\n"
             text += f"   Цена: {p['price']} {p['currency']}\n"
             text += f"   Ключ: `{p['key']}`\n"
@@ -427,15 +604,18 @@ async def menu_purchases(callback: types.CallbackQuery):
     await callback.message.edit_caption(caption=text, parse_mode="Markdown", reply_markup=main_menu_keyboard())
     await callback.answer()
 
-# Админ-панель
+# ========== АДМИН-ПАНЕЛЬ ==========
+
 @dp.callback_query(F.data == "menu_admin")
 async def menu_admin(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
         await callback.answer("⛔ Доступ запрещен", show_alert=True)
         return
     
-    pending_count = len(data["pending_uah"])
-    text = f"🔧 *Админ-панель*\n\n📊 Ожидает подтверждения UAH: {pending_count}\n\nВыберите действие:"
+    pending_uah = len(data["pending_uah"])
+    pending_crypto = len([p for p in data["pending_crypto"] if p.startswith("crypto_")])
+    
+    text = f"🔧 *Админ-панель*\n\n📊 Ожидает подтверждения UAH: {pending_uah}\n💎 Ожидает подтверждения CRYPTO: {pending_crypto}\n\nВыберите действие:"
     await callback.message.edit_caption(caption=text, parse_mode="Markdown", reply_markup=admin_panel_keyboard())
     await callback.answer()
 
@@ -450,6 +630,7 @@ async def admin_give_key(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(States.admin_waiting_user_id)
     await callback.answer()
 
+# Подтверждение UAH
 @dp.callback_query(F.data == "admin_confirm_uah")
 async def admin_confirm_uah(callback: types.CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID:
@@ -457,26 +638,26 @@ async def admin_confirm_uah(callback: types.CallbackQuery, state: FSMContext):
         return
     
     if not data["pending_uah"]:
-        await callback.answer("Нет ожидающих оплат!", show_alert=True)
+        await callback.answer("Нет ожидающих UAH оплат!", show_alert=True)
         return
     
     builder = InlineKeyboardBuilder()
     for pid, info in data["pending_uah"].items():
-        builder.button(text=f"✅ @{info['username']} - {info['product']}", callback_data=f"confirm_{pid}")
+        builder.button(text=f"✅ @{info['username']} - {info['product']} ({info['price']} грн)", callback_data=f"confirm_uah_{pid}")
     builder.button(text="🔙 Назад", callback_data="menu_admin")
     builder.adjust(1)
     
-    await callback.message.edit_caption(caption="📋 *Выберите оплату для подтверждения:*", 
+    await callback.message.edit_caption(caption="📋 *Выберите UAH оплату для подтверждения:*", 
                                         parse_mode="Markdown", reply_markup=builder.as_markup())
     await callback.answer()
 
-@dp.callback_query(F.data.startswith("confirm_"))
-async def confirm_payment(callback: types.CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data.startswith("confirm_uah_"))
+async def confirm_uah_payment(callback: types.CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID:
         await callback.answer("⛔ Доступ запрещен", show_alert=True)
         return
     
-    pending_id = callback.data.replace("confirm_", "")
+    pending_id = callback.data.replace("confirm_uah_", "")
     pending = data["pending_uah"].get(pending_id)
     
     if not pending:
@@ -484,15 +665,67 @@ async def confirm_payment(callback: types.CallbackQuery, state: FSMContext):
         return
     
     await state.update_data(pending_id=pending_id, user_id=pending["user_id"], 
-                          product=pending["product"], period=pending["period"],
+                          product_name=pending["product"], period=pending["period"],
                           price=pending["price"], product_code=pending["product_code"],
-                          period_code=pending["period_code"])
+                          period_code=pending["period_code"], payment_type="UAH")
     
     await callback.message.edit_caption(caption=f"✏️ *Введите ключ для пользователя @{pending['username']}*\n\nТовар: {pending['product']} ({pending['period']})",
                                         parse_mode="Markdown", reply_markup=cancel_keyboard())
-    await state.set_state(States.admin_waiting_manual_key)
+    await state.set_state(States.admin_waiting_uah_key)
     await callback.answer()
 
+# Подтверждение CRYPTO
+@dp.callback_query(F.data == "admin_confirm_crypto")
+async def admin_confirm_crypto(callback: types.CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Доступ запрещен", show_alert=True)
+        return
+    
+    crypto_pending = {k: v for k, v in data["pending_crypto"].items() if k.startswith("crypto_")}
+    
+    if not crypto_pending:
+        await callback.answer("Нет ожидающих CRYPTO оплат!", show_alert=True)
+        return
+    
+    builder = InlineKeyboardBuilder()
+    for pid, info in crypto_pending.items():
+        builder.button(text=f"💎 @{info.get('username', 'user')} - {info['product_name']} ({info['price']} USDT)", callback_data=f"confirm_crypto_{pid}")
+    builder.button(text="🔙 Назад", callback_data="menu_admin")
+    builder.adjust(1)
+    
+    # Получаем username для отображения
+    for pid, info in crypto_pending.items():
+        user = data["users"].get(str(info["user_id"]), {})
+        info["username"] = user.get("username", "user")
+    
+    await callback.message.edit_caption(caption="📋 *Выберите CRYPTO оплату для подтверждения:*", 
+                                        parse_mode="Markdown", reply_markup=builder.as_markup())
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("confirm_crypto_"))
+async def confirm_crypto_payment(callback: types.CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("⛔ Доступ запрещен", show_alert=True)
+        return
+    
+    pending_id = callback.data.replace("confirm_crypto_", "")
+    pending = data["pending_crypto"].get(pending_id)
+    
+    if not pending:
+        await callback.answer("Уже обработано!", show_alert=True)
+        return
+    
+    await state.update_data(pending_id=pending_id, user_id=pending["user_id"], 
+                          product_name=pending["product_name"], period=pending["period"],
+                          price=pending["price"], product_code=pending["product"],
+                          period_code=pending["period"], payment_type="CRYPTO")
+    
+    await callback.message.edit_caption(caption=f"✏️ *Введите ключ для пользователя ID: {pending['user_id']}*\n\nТовар: {pending['product_name']} ({pending['period']})",
+                                        parse_mode="Markdown", reply_markup=cancel_keyboard())
+    await state.set_state(States.admin_waiting_crypto_key)
+    await callback.answer()
+
+# Выдача ключей (общий обработчик)
 @dp.message(States.admin_waiting_user_id)
 async def get_user_id_for_key(message: types.Message, state: FSMContext):
     try:
@@ -513,7 +746,6 @@ async def send_key_to_user(message: types.Message, state: FSMContext):
     data_state = await state.get_data()
     user_id = data_state["target_user"]
     
-    # Выдаем ключ (демо-ключ без конкретного товара)
     data["users"][str(user_id)]["active_key"] = key
     data["users"][str(user_id)]["active_product"] = "Выдан администратором"
     data["users"][str(user_id)]["expires_at"] = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
@@ -523,38 +755,69 @@ async def send_key_to_user(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Ключ отправлен пользователю {user_id}!", reply_markup=main_menu_keyboard())
     await state.clear()
 
-@dp.message(States.admin_waiting_manual_key)
-async def send_manual_key(message: types.Message, state: FSMContext):
+@dp.message(States.admin_waiting_uah_key)
+async def send_uah_key(message: types.Message, state: FSMContext):
     key = message.text
     data_state = await state.get_data()
     
     pending_id = data_state["pending_id"]
     user_id = data_state["user_id"]
-    product_name = data_state["product"]
+    product_name = data_state["product_name"]
     period = data_state["period"]
     price = data_state["price"]
     product_code = data_state["product_code"]
     period_code = data_state["period_code"]
     
-    # Добавляем покупку
-    add_purchase(user_id, product_name, period, price, "UAH", key)
+    # Добавляем покупку и активируем
+    add_purchase(user_id, product_name, period, price, "UAH", key, status="active")
+    activate_key(user_id, key, product_name, period)
     
     # Удаляем из pending
-    del data["pending_uah"][pending_id]
+    if pending_id in data["pending_uah"]:
+        del data["pending_uah"][pending_id]
     save_data()
     
-    await bot.send_message(user_id, f"✅ *Ваша оплата подтверждена!*\n\n📦 Товар: {product_name} ({period})\n🔑 *Ваш ключ:* `{key}`\n\nСпасибо за покупку!", parse_mode="Markdown")
+    await bot.send_message(user_id, f"✅ *Ваша UAH оплата подтверждена!*\n\n📦 Товар: {product_name} ({period})\n🔑 *Ваш ключ:* `{key}`\n\nСпасибо за покупку!", parse_mode="Markdown")
     await message.answer(f"✅ Ключ выдан пользователю {user_id}!\n\nТовар: {product_name} ({period})", reply_markup=main_menu_keyboard())
     await state.clear()
 
-# Навигация
+@dp.message(States.admin_waiting_crypto_key)
+async def send_crypto_key(message: types.Message, state: FSMContext):
+    key = message.text
+    data_state = await state.get_data()
+    
+    pending_id = data_state["pending_id"]
+    user_id = data_state["user_id"]
+    product_name = data_state["product_name"]
+    period = data_state["period"]
+    price = data_state["price"]
+    product_code = data_state["product_code"]
+    period_code = data_state["period_code"]
+    
+    # Добавляем покупку и активируем
+    add_purchase(user_id, product_name, period, price, "USDT", key, status="active")
+    activate_key(user_id, key, product_name, period)
+    
+    # Удаляем из pending
+    if pending_id in data["pending_crypto"]:
+        del data["pending_crypto"][pending_id]
+    save_data()
+    
+    await bot.send_message(user_id, f"✅ *Ваша CRYPTO оплата подтверждена!*\n\n📦 Товар: {product_name} ({period})\n🔑 *Ваш ключ:* `{key}`\n\nСпасибо за покупку!", parse_mode="Markdown")
+    await message.answer(f"✅ Ключ выдан пользователю {user_id}!\n\nТовар: {product_name} ({period})", reply_markup=main_menu_keyboard())
+    await state.clear()
+
+# ========== НАВИГАЦИЯ ==========
+
 @dp.callback_query(F.data == "back_to_main")
-async def back_to_main(callback: types.CallbackQuery):
+async def back_to_main(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
     await show_main_menu(callback.message.chat.id)
     await callback.answer()
 
 @dp.callback_query(F.data == "back_to_catalog")
-async def back_to_catalog(callback: types.CallbackQuery):
+async def back_to_catalog(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
     text = "📋 *Выберите игру:*"
     await send_with_photo(callback.message.chat.id, CATALOG_PHOTO, text, catalog_keyboard())
     await callback.answer()
@@ -582,8 +845,12 @@ async def cancel_action(callback: types.CallbackQuery, state: FSMContext):
     await show_main_menu(callback.message.chat.id)
     await callback.answer()
 
+# ========== ЗАПУСК ==========
+
 async def main():
     print("✅ Бот запущен!")
+    print(f"👑 Админ ID: {ADMIN_ID}")
+    print("📦 Жду команды...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
