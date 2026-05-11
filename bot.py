@@ -11,7 +11,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, DefaultBotProperties
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # ========== КОНФИГ ==========
@@ -23,42 +23,42 @@ UAH_COMMENT = "За цифрові товари"
 
 # ========== КАСТОМНЫЕ ЭМОДЗИ ID (Telegram Premium) ==========
 EMOJI = {
-    "playcheat": "5931409969613116639",  # PlayCheatGameBot
-    "star": "5805532930662996322",       # Почему мы? / Оплата гривной
-    "catalog": "5208513917965328345",    # Каталог
-    "profile": "5886412370347036129",    # Профиль
-    "purchases": "5983399041197675256",  # Мои покупки
-    "oxide": "5312048193444282508",      # Oxide Survival Island
-    "standoff": "5819078828017849357",   # Standoff 2
-    "back_main": "5877629862306385808",  # В главное меню / Назад к играм
-    "lebro_vip": "5208422125924275090",  # Lebro [VIP]
-    "lebro_lite": "5208422125924275090", # Lebro [Lite]
-    "period": "5985596818912712352",     # Эмодзи для периодов
-    "crypto": "5361914370068613491",     # CryptoBot (USDT)
-    "uah": "5805532930662996322",        # Оплата гривной
-    "back_periods": "5877629862306385808", # назад к периодам
-    "invoice": "5983399041197675256",    # Создан счет
-    "sum": "5208513917965328345",        # Сумма
-    "product": "5877260593903177342",    # Товар
-    "link": "5877465816030515018",       # Ссылка для оплаты
-    "check": "6005843436479975944",      # Проверить оплату
-    "cancel": "5985346521103604145",     # Отмена
-    "card": "5208431570557360595",       # Карта для оплаты
-    "receipt": "6050592962730005028",    # После оплаты отправьте скриншот
-    "no_key": "5208431570557360595",     # Без чека ключ НЕ будет выдан
-    "receipt_sent": "5985596818912712352", # Чек отправлен
-    "confirmed": "5985596818912712352",  # Ваша UAH оплата подтверждена
-    "your_key": "6005570495603282482",   # Ваш ключ
-    "thanks": "5985596818912712352",     # Спасибо за покупку
-    "user_id": "5886505193180239900",    # ID
-    "username": "5771887475421090729",   # Юзернейм
-    "name": "5897962422169243693",       # Имя
-    "active_key": "6005570495603282482", # Активный ключ
-    "expires": "5897962422169243693",    # Срок до
-    "game_select": "5960551395730919906", # Выберите игру
-    "lebroname": "5877260593903177342",  # Lebro (Vip или Lite)
-    "to_pay": "5983399041197675256",     # К оплате
-    "back_game": "5877629862306385808",  # Назад к играм
+    "playcheat": "5931409969613116639",
+    "star": "5805532930662996322",
+    "catalog": "5208513917965328345",
+    "profile": "5886412370347036129",
+    "purchases": "5983399041197675256",
+    "oxide": "5312048193444282508",
+    "standoff": "5819078828017849357",
+    "back_main": "5877629862306385808",
+    "lebro_vip": "5208422125924275090",
+    "lebro_lite": "5208422125924275090",
+    "period": "5985596818912712352",
+    "crypto": "5361914370068613491",
+    "uah": "5805532930662996322",
+    "back_periods": "5877629862306385808",
+    "invoice": "5983399041197675256",
+    "sum": "5208513917965328345",
+    "product": "5877260593903177342",
+    "link": "5877465816030515018",
+    "check": "6005843436479975944",
+    "cancel": "5985346521103604145",
+    "card": "5208431570557360595",
+    "receipt": "6050592962730005028",
+    "no_key": "5208431570557360595",
+    "receipt_sent": "5985596818912712352",
+    "confirmed": "5985596818912712352",
+    "your_key": "6005570495603282482",
+    "thanks": "5985596818912712352",
+    "user_id": "5886505193180239900",
+    "username": "5771887475421090729",
+    "name": "5897962422169243693",
+    "active_key": "6005570495603282482",
+    "expires": "5897962422169243693",
+    "game_select": "5960551395730919906",
+    "lebroname": "5877260593903177342",
+    "to_pay": "5983399041197675256",
+    "back_game": "5877629862306385808",
 }
 
 # Цены и товары
@@ -115,30 +115,10 @@ class States(StatesGroup):
     admin_waiting_uah_key = State()
 
 # ========== ФУНКЦИЯ ДЛЯ СОЗДАНИЯ КНОПОК С ЭМОДЗИ ==========
-def make_button(text: str, callback_data: str, emoji_id: str = None, style: str = None) -> InlineKeyboardButton:
-    """Создает кнопку с кастомным эмодзи"""
+def make_button(text: str, callback_data: str, emoji_id: str = None) -> InlineKeyboardButton:
     if emoji_id:
         text = f'<tg-emoji emoji-id="{emoji_id}"> </tg-emoji>{text}'
     return InlineKeyboardButton(text=text, callback_data=callback_data)
-
-def make_inline_keyboard(buttons_data: list) -> InlineKeyboardMarkup:
-    """Создает инлайн клавиатуру из списка кнопок"""
-    keyboard = []
-    for row in buttons_data:
-        keyboard_row = []
-        for btn in row:
-            style = btn.get("style")
-            # Для премиум стилей используем специальный параметр
-            if style == "danger":
-                keyboard_row.append(InlineKeyboardButton(text=btn["text"], callback_data=btn["callback_data"]))
-            elif style == "success":
-                keyboard_row.append(InlineKeyboardButton(text=btn["text"], callback_data=btn["callback_data"]))
-            elif style == "primary":
-                keyboard_row.append(InlineKeyboardButton(text=btn["text"], callback_data=btn["callback_data"]))
-            else:
-                keyboard_row.append(InlineKeyboardButton(text=btn["text"], callback_data=btn["callback_data"]))
-        keyboard.append(keyboard_row)
-    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 # ========== КЛАВИАТУРЫ ==========
 
@@ -309,7 +289,6 @@ def activate_key(user_id, key, product_name, period):
     save_data()
 
 def format_with_emoji(text: str) -> str:
-    """Заменяет маркеры на кастомные эмодзи"""
     replacements = {
         "{playcheat}": f'<tg-emoji emoji-id="{EMOJI["playcheat"]}"> </tg-emoji>',
         "{star}": f'<tg-emoji emoji-id="{EMOJI["star"]}"> </tg-emoji>',
@@ -327,16 +306,15 @@ def format_with_emoji(text: str) -> str:
 
 # ========== БОТ ==========
 
-bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
 def is_admin(user_id):
     return user_id == ADMIN_ID
 
 async def send_with_emoji(chat_id, text, keyboard=None):
-    """Отправляет сообщение с HTML разметкой и эмодзи"""
     formatted_text = format_with_emoji(text)
-    await bot.send_message(chat_id=chat_id, text=formatted_text, reply_markup=keyboard)
+    await bot.send_message(chat_id=chat_id, text=formatted_text, parse_mode="HTML", reply_markup=keyboard)
 
 # ========== ОСНОВНЫЕ ХЭНДЛЕРЫ ==========
 
@@ -357,7 +335,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 🛡 <b>4. Заключительные:</b> Исполнитель вправе изменять условия.
 
 ✅ Нажмите на кнопку ниже, чтобы продолжить"""
-        await message.answer(rules, reply_markup=agreement_keyboard())
+        await message.answer(rules, parse_mode="HTML", reply_markup=agreement_keyboard())
         await state.set_state(States.waiting_agreement)
     else:
         await show_main_menu(message.chat.id)
@@ -442,7 +420,7 @@ async def pay_crypto(callback: types.CallbackQuery, state: FSMContext):
     
     if not invoice:
         text = "❌ Ошибка создания счета. Попробуйте позже."
-        await callback.message.edit_text(text, reply_markup=payment_keyboard())
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_keyboard())
         await callback.answer()
         return
     
@@ -475,7 +453,7 @@ async def pay_crypto(callback: types.CallbackQuery, state: FSMContext):
 
 <tg-emoji emoji-id="6005843436479975944"> </tg-emoji> После оплаты нажмите кнопку ниже для проверки"""
     
-    await callback.message.edit_text(text, reply_markup=check_payment_keyboard(invoice_id))
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=check_payment_keyboard(invoice_id))
     await state.update_data(crypto_invoice_id=invoice_id)
     await state.set_state(States.waiting_crypto_payment)
     await callback.answer()
@@ -518,7 +496,7 @@ async def check_payment(callback: types.CallbackQuery, state: FSMContext):
 ⏳ Ожидайте выдачи ключа от администратора...
 Администратор уже уведомлен."""
         
-        await callback.message.edit_text(text)
+        await callback.message.edit_text(text, parse_mode="HTML")
         
         await bot.send_message(
             ADMIN_ID,
@@ -566,7 +544,7 @@ async def pay_uah(callback: types.CallbackQuery, state: FSMContext):
 
 <tg-emoji emoji-id="5208431570557360595"> </tg-emoji> Без чека ключ НЕ будет выдан"""
     
-    await callback.message.edit_text(text, reply_markup=uah_receipt_keyboard())
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=uah_receipt_keyboard())
     await state.set_state(States.waiting_uah_receipt)
     await callback.answer()
 
@@ -602,7 +580,7 @@ async def receive_uah_receipt(message: types.Message, state: FSMContext):
     await bot.send_photo(ADMIN_ID, photo_id, caption=admin_text, parse_mode="HTML")
     
     text = "<tg-emoji emoji-id=\"5985596818912712352\"> </tg-emoji> Чек отправлен! Администратор выдаст ключ после проверки."
-    await message.answer(text)
+    await message.answer(text, parse_mode="HTML")
     await state.clear()
 
 # ========== ПРОФИЛЬ И ПОКУПКИ ==========
@@ -625,7 +603,7 @@ async def menu_profile(callback: types.CallbackQuery):
 <tg-emoji emoji-id="5208513917965328345"> </tg-emoji> <b>Товар:</b> {product}
 <tg-emoji emoji-id="5897962422169243693"> </tg-emoji> <b>Срок до:</b> {expires}"""
     
-    await callback.message.edit_text(text, reply_markup=main_menu_keyboard(is_admin(callback.from_user.id)))
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=main_menu_keyboard(is_admin(callback.from_user.id)))
     await callback.answer()
 
 @dp.callback_query(F.data == "menu_purchases")
@@ -644,7 +622,7 @@ async def menu_purchases(callback: types.CallbackQuery):
             text += f"   Ключ: <code>{p['key']}</code>\n"
             text += f"   Дата: {p['purchased_at']}\n\n"
     
-    await callback.message.edit_text(text, reply_markup=main_menu_keyboard(is_admin(callback.from_user.id)))
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=main_menu_keyboard(is_admin(callback.from_user.id)))
     await callback.answer()
 
 # ========== АДМИН-ПАНЕЛЬ ==========
@@ -659,7 +637,7 @@ async def menu_admin(callback: types.CallbackQuery):
     pending_crypto = len([p for p in data["pending_crypto"] if p.startswith("crypto_")])
     
     text = f"🔧 <b>Админ-панель</b>\n\n📊 Ожидает подтверждения UAH: {pending_uah}\n💎 Ожидает подтверждения CRYPTO: {pending_crypto}\n\nВыберите действие:"
-    await callback.message.edit_text(text, reply_markup=admin_panel_keyboard())
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=admin_panel_keyboard())
     await callback.answer()
 
 @dp.callback_query(F.data == "admin_give_key")
@@ -669,7 +647,7 @@ async def admin_give_key(callback: types.CallbackQuery, state: FSMContext):
         return
     
     text = "✏️ <b>Введите ID пользователя:</b>\n\n(можно найти в профиле пользователя)"
-    await callback.message.edit_text(text, reply_markup=cancel_keyboard())
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=cancel_keyboard())
     await state.set_state(States.admin_waiting_user_id)
     await callback.answer()
 
@@ -689,7 +667,7 @@ async def admin_confirm_uah(callback: types.CallbackQuery, state: FSMContext):
     builder.button(text="🔙 Назад", callback_data="menu_admin")
     builder.adjust(1)
     
-    await callback.message.edit_text("📋 <b>Выберите UAH оплату для подтверждения:</b>", reply_markup=builder.as_markup())
+    await callback.message.edit_text("📋 <b>Выберите UAH оплату для подтверждения:</b>", parse_mode="HTML", reply_markup=builder.as_markup())
     await callback.answer()
 
 @dp.callback_query(F.data == "admin_confirm_crypto")
@@ -712,7 +690,7 @@ async def admin_confirm_crypto(callback: types.CallbackQuery, state: FSMContext)
     builder.button(text="🔙 Назад", callback_data="menu_admin")
     builder.adjust(1)
     
-    await callback.message.edit_text("📋 <b>Выберите CRYPTO оплату для подтверждения:</b>", reply_markup=builder.as_markup())
+    await callback.message.edit_text("📋 <b>Выберите CRYPTO оплату для подтверждения:</b>", parse_mode="HTML", reply_markup=builder.as_markup())
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("confirm_uah_"))
@@ -736,7 +714,7 @@ async def confirm_uah_payment(callback: types.CallbackQuery, state: FSMContext):
     )
     
     text = f"✏️ <b>Введите ключ для пользователя @{pending['username']}</b>\n\nТовар: {pending['product']} ({pending['period']})"
-    await callback.message.edit_text(text, reply_markup=cancel_keyboard())
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=cancel_keyboard())
     await state.set_state(States.admin_waiting_uah_key)
     await callback.answer()
 
@@ -763,7 +741,7 @@ async def confirm_crypto_payment(callback: types.CallbackQuery, state: FSMContex
     )
     
     text = f"✏️ <b>Введите ключ для пользователя @{user.get('username', 'user')}</b>\n\nТовар: {pending['product_name']} ({pending['period']})"
-    await callback.message.edit_text(text, reply_markup=cancel_keyboard())
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=cancel_keyboard())
     await state.set_state(States.admin_waiting_crypto_key)
     await callback.answer()
 
@@ -772,16 +750,16 @@ async def get_user_id_for_key(message: types.Message, state: FSMContext):
     try:
         user_id = int(message.text.strip())
         if str(user_id) not in data["users"]:
-            await message.answer("❌ Пользователь не найден!")
+            await message.answer("❌ Пользователь не найден!", parse_mode="HTML")
             await state.clear()
             await show_main_menu(message.chat.id)
             return
         await state.update_data(target_user=user_id)
         text = "🔑 <b>Введите ключ для выдачи:</b>"
-        await message.answer(text, reply_markup=cancel_keyboard())
+        await message.answer(text, parse_mode="HTML", reply_markup=cancel_keyboard())
         await state.set_state(States.admin_waiting_key)
     except:
-        await message.answer("❌ Введите корректный ID (число)!")
+        await message.answer("❌ Введите корректный ID (число)!", parse_mode="HTML")
 
 @dp.message(States.admin_waiting_key)
 async def send_key_to_user(message: types.Message, state: FSMContext):
@@ -795,7 +773,7 @@ async def send_key_to_user(message: types.Message, state: FSMContext):
     save_data()
     
     await bot.send_message(user_id, f"✅ <b>Вам выдан ключ администратором!</b>\n\n🔑 Ключ: <code>{key}</code>\n\nИспользуйте его для активации.", parse_mode="HTML")
-    await message.answer(f"✅ Ключ отправлен пользователю {user_id}!")
+    await message.answer(f"✅ Ключ отправлен пользователю {user_id}!", parse_mode="HTML")
     await state.clear()
     await show_main_menu(message.chat.id)
 
@@ -825,7 +803,7 @@ async def send_uah_key(message: types.Message, state: FSMContext):
 <tg-emoji emoji-id="5985596818912712352"> </tg-emoji> Спасибо за покупку!"""
     
     await bot.send_message(user_id, text, parse_mode="HTML")
-    await message.answer(f"✅ Ключ выдан пользователю {user_id}!\n\nТовар: {product_name} ({period})")
+    await message.answer(f"✅ Ключ выдан пользователю {user_id}!\n\nТовар: {product_name} ({period})", parse_mode="HTML")
     await state.clear()
     await show_main_menu(message.chat.id)
 
@@ -855,7 +833,7 @@ async def send_crypto_key(message: types.Message, state: FSMContext):
 <tg-emoji emoji-id="5985596818912712352"> </tg-emoji> Спасибо за покупку!"""
     
     await bot.send_message(user_id, text, parse_mode="HTML")
-    await message.answer(f"✅ Ключ выдан пользователю {user_id}!\n\nТовар: {product_name} ({period})")
+    await message.answer(f"✅ Ключ выдан пользователю {user_id}!\n\nТовар: {product_name} ({period})", parse_mode="HTML")
     await state.clear()
     await show_main_menu(message.chat.id)
 
