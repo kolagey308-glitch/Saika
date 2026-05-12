@@ -59,6 +59,11 @@ EMOJI = {
     "lebroname": "5877260593903177342",
     "to_pay": "5983399041197675256",
     "back_game": "5877629862306385808",
+    "agree_emoji": "5985346521103604145",  # для кнопки согласия
+    "rules_1": "5985346521103604145",      # для пункта 1 правил
+    "rules_2": "5985346521103604145",      # для пункта 2
+    "rules_3": "5985346521103604145",      # для пункта 3
+    "rules_4": "5985346521103604145",      # для пункта 4
 }
 
 # Цены и товары
@@ -123,8 +128,9 @@ def make_button(text: str, callback_data: str, emoji_id: str = None) -> InlineKe
 # ========== КЛАВИАТУРЫ ==========
 
 def agreement_keyboard():
+    """Кнопка согласия с премиум эмодзи"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [make_button("✅ Я ознакомлен с правилами", "agree", None)]
+        [make_button("Я ознакомлен с правилами", "agree", EMOJI["agree_emoji"])]
     ])
 
 def main_menu_keyboard(is_admin=False):
@@ -299,6 +305,7 @@ def format_with_emoji(text: str) -> str:
         "{cancel}": f'<tg-emoji emoji-id="{EMOJI["cancel"]}"> </tg-emoji>',
         "{confirmed}": f'<tg-emoji emoji-id="{EMOJI["confirmed"]}"> </tg-emoji>',
         "{key_icon}": f'<tg-emoji emoji-id="{EMOJI["your_key"]}"> </tg-emoji>',
+        "{agree}": f'<tg-emoji emoji-id="{EMOJI["agree_emoji"]}"> </tg-emoji>',
     }
     for k, v in replacements.items():
         text = text.replace(k, v)
@@ -324,17 +331,22 @@ async def cmd_start(message: types.Message, state: FSMContext):
     register_user(message.from_user.id, message.from_user.username, message.from_user.full_name)
     
     if not data["users"][str(message.from_user.id)]["agreed"]:
-        rules = """📜 <b>Правила PlayCheatGameBot</b> 
+        # Правила с премиум эмодзи
+        rules = f"""<tg-emoji emoji-id="{EMOJI['playcheat']}"> </tg-emoji> <b>Правила PlayCheatGameBot</b>
 
-🚫 <b>1. Возврат:</b> Возврата нет — при покупке цифрового товара потеря, неправильное использование никто не компенсирует.
+<tg-emoji emoji-id="{EMOJI['rules_1']}"> </tg-emoji> <b>1. Возврат:</b> Возврата нет — при покупке цифрового товара потеря, неправильное использование никто не компенсирует.
 
-⚠️ <b>2. Ответственность:</b> Исполнитель не несёт ответственности за последствия применения.
+<tg-emoji emoji-id="{EMOJI['rules_2']}"> </tg-emoji> <b>2. Ответственность:</b> Исполнитель не несёт ответственности за последствия применения.
 
-📜 <b>3. Общие:</b> Оплачивая услугу, вы соглашаетесь с данными правилами.
+<tg-emoji emoji-id="{EMOJI['rules_3']}"> </tg-emoji> <b>3. Общие:</b> Оплачивая услугу, вы соглашаетесь с данными правилами.
 
-🛡 <b>4. Заключительные:</b> Исполнитель вправе изменять условия.
+<tg-emoji emoji-id="{EMOJI['rules_4']}"> </tg-emoji> <b>4. Заключительные:</b> Исполнитель вправе изменять условия.
 
-✅ Нажмите на кнопку ниже, чтобы продолжить"""
+{agree} Нажмите на кнопку ниже, чтобы продолжить"""
+        
+        # Заменяем {agree} на эмодзи
+        rules = rules.replace("{agree}", f'<tg-emoji emoji-id="{EMOJI["agree_emoji"]}"> </tg-emoji>')
+        
         await message.answer(rules, parse_mode="HTML", reply_markup=agreement_keyboard())
         await state.set_state(States.waiting_agreement)
     else:
