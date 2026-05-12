@@ -12,7 +12,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # ========== КОНФИГ ==========
@@ -22,52 +22,15 @@ CRYPTO_BOT_TOKEN = "560372:AAyQpvWZFSHpzrnVAhVwPF7PbcJmqI7bH0K"
 UAH_CARD = "4441111008011946"
 UAH_COMMENT = "За цифрові товари"
 
-# ========== КАСТОМНЫЕ ЭМОДЗИ ID (Telegram Premium) ==========
-EMOJI = {
-    "playcheat": "5931409969613116639",
-    "star": "5805532930662996322",
-    "catalog": "5208513917965328345",
-    "profile": "5886412370347036129",
-    "purchases": "5983399041197675256",
-    "oxide": "5312048193444282508",
-    "standoff": "5819078828017849357",
-    "back_main": "5877629862306385808",
-    "lebro_vip": "5208422125924275090",
-    "lebro_lite": "5208422125924275090",
-    "period": "5985596818912712352",
-    "crypto": "5361914370068613491",
-    "uah": "5805532930662996322",
-    "back_periods": "5877629862306385808",
-    "invoice": "5983399041197675256",
-    "sum": "5208513917965328345",
-    "product": "5877260593903177342",
-    "link": "5877465816030515018",
-    "check": "6005843436479975944",
-    "cancel": "5985346521103604145",
-    "card": "5208431570557360595",
-    "receipt": "6050592962730005028",
-    "no_key": "5208431570557360595",
-    "receipt_sent": "5985596818912712352",
-    "confirmed": "5985596818912712352",
-    "your_key": "6005570495603282482",
-    "thanks": "5985596818912712352",
-    "user_id": "5886505193180239900",
-    "username": "5771887475421090729",
-    "name": "5897962422169243693",
-    "active_key": "6005570495603282482",
-    "expires": "5897962422169243693",
-    "game_select": "5960551395730919906",
-    "lebroname": "5877260593903177342",
-    "to_pay": "5983399041197675256",
-    "back_game": "5877629862306385808",
-    "agree_emoji": "5985346521103604145",
-    "rules_1": "5985346521103604145",
-    "rules_2": "5985346521103604145",
-    "rules_3": "5985346521103604145",
-    "rules_4": "5985346521103604145",
-}
+# ========== ФОТО ==========
+MENU_PHOTO = "https://files.catbox.moe/vz52pd.png"
+CATALOG_PHOTO = "https://files.catbox.moe/w1ruj1.png"
+GAME_SELECT_PHOTO = "https://files.catbox.moe/kxk5w3.png"
+SYSTEM_PHOTO = "https://files.catbox.moe/87qpck.png"
+PERIOD_PHOTO = "https://files.catbox.moe/b795ua.png"
+PAYMENT_PHOTO = "https://files.catbox.moe/tzogel.png"
 
-# Цены и товары
+# ========== Цены и товары ==========
 PRICES = {
     "Lebro_Lite": {"24h": 1.5, "7d": 4.5},
     "Lebro_VIP": {"24h": 3, "7d": 7.5, "30d": 15},
@@ -288,6 +251,16 @@ def activate_key(user_id, key, product_name, period):
             break
     save_data()
 
+async def send_photo_with_caption(chat_id, photo_url, caption, reply_markup=None):
+    """Отправка фото с подписью"""
+    await bot.send_photo(
+        chat_id=chat_id,
+        photo=photo_url,
+        caption=caption,
+        parse_mode="HTML",
+        reply_markup=reply_markup
+    )
+
 # ========== БОТ ==========
 
 bot = Bot(token=BOT_TOKEN)
@@ -339,7 +312,7 @@ async def show_main_menu(chat_id):
 • Проверенные софты
 
 <b>Выберите действие:</b>"""
-    await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", reply_markup=main_menu_keyboard(is_admin(chat_id)))
+    await send_photo_with_caption(chat_id, MENU_PHOTO, text, main_menu_keyboard(is_admin(chat_id)))
 
 # ========== КАТАЛОГ ==========
 
@@ -347,21 +320,21 @@ async def show_main_menu(chat_id):
 async def menu_catalog(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
     text = "📋 <b>Выберите игру:</b>"
-    await bot.send_message(callback.message.chat.id, text, parse_mode="HTML", reply_markup=catalog_keyboard())
+    await send_photo_with_caption(callback.message.chat.id, CATALOG_PHOTO, text, catalog_keyboard())
     await callback.answer()
 
 @dp.callback_query(F.data == "game_oxide")
 async def game_oxide(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(game="oxide")
     text = "🎮 <b>Oxide Survival Island - Выберите софт:</b>"
-    await bot.send_message(callback.message.chat.id, text, parse_mode="HTML", reply_markup=products_keyboard("oxide"))
+    await send_photo_with_caption(callback.message.chat.id, GAME_SELECT_PHOTO, text, products_keyboard("oxide"))
     await callback.answer()
 
 @dp.callback_query(F.data == "game_standoff")
 async def game_standoff(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(game="standoff")
     text = "🎮 <b>Standoff 2 - Выберите софт:</b>"
-    await bot.send_message(callback.message.chat.id, text, parse_mode="HTML", reply_markup=products_keyboard("standoff"))
+    await send_photo_with_caption(callback.message.chat.id, GAME_SELECT_PHOTO, text, products_keyboard("standoff"))
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("product_"))
@@ -370,7 +343,7 @@ async def select_product(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(product=product)
     product_name = PRODUCT_NAMES[product]
     text = f"📦 <b>{product_name}</b>\n\nВыберите период действия:"
-    await bot.send_message(callback.message.chat.id, text, parse_mode="HTML", reply_markup=periods_keyboard(product))
+    await send_photo_with_caption(callback.message.chat.id, SYSTEM_PHOTO, text, periods_keyboard(product))
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("period_"))
@@ -384,7 +357,7 @@ async def select_period(callback: types.CallbackQuery, state: FSMContext):
     currency = "USDT" if "Lebro" in product else "UAH"
     
     text = f"💸 <b>К оплате: {price} {currency}</b>\n\nВыберите способ оплаты:"
-    await bot.send_message(callback.message.chat.id, text, parse_mode="HTML", reply_markup=payment_keyboard())
+    await send_photo_with_caption(callback.message.chat.id, PAYMENT_PHOTO, text, payment_keyboard())
     await callback.answer()
 
 # ========== CRYPTO ОПЛАТА С АВТОВЫДАЧЕЙ ==========
@@ -407,14 +380,13 @@ async def pay_crypto(callback: types.CallbackQuery, state: FSMContext):
     
     if not invoice:
         text = "❌ Ошибка создания счета. Попробуйте позже."
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=payment_keyboard())
+        await callback.message.edit_caption(caption=text, reply_markup=payment_keyboard())
         await callback.answer()
         return
     
     invoice_id = invoice["invoice_id"]
     pay_url = invoice["pay_url"]
     
-    # Генерируем автоматический ключ
     auto_key = f"AUTO-{product_name[:4]}-{period}-{random.randint(1000, 9999)}"
     
     data["pending_crypto"][str(invoice_id)] = {
@@ -445,7 +417,7 @@ async def pay_crypto(callback: types.CallbackQuery, state: FSMContext):
 
 🔄 После оплаты нажмите кнопку ниже для проверки"""
     
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=check_payment_keyboard(invoice_id))
+    await callback.message.edit_caption(caption=text, reply_markup=check_payment_keyboard(invoice_id))
     await state.update_data(crypto_invoice_id=invoice_id)
     await state.set_state(States.waiting_crypto_payment)
     await callback.answer()
@@ -474,11 +446,9 @@ async def check_payment(callback: types.CallbackQuery, state: FSMContext):
         price = invoice_info["price"]
         auto_key = invoice_info.get("key", f"KEY-{user_id}-{int(time.time())}")
         
-        # Активируем ключ автоматически
         add_purchase(user_id, product_name, period, price, "USDT", auto_key, status="active")
         activate_key(user_id, auto_key, product_name, period)
         
-        # Удаляем временные данные
         if str(invoice_id) in data["pending_crypto"]:
             del data["pending_crypto"][str(invoice_id)]
         if str(invoice_id) in data["temp_invoices"]:
@@ -493,9 +463,8 @@ async def check_payment(callback: types.CallbackQuery, state: FSMContext):
 
 🎉 Спасибо за покупку!"""
         
-        await callback.message.edit_text(text, parse_mode="HTML")
+        await callback.message.edit_caption(caption=text)
         
-        # Уведомление админу
         await bot.send_message(
             ADMIN_ID,
             f"✅ <b>CRYPTO ОПЛАТА</b>\n\n"
@@ -549,7 +518,7 @@ async def pay_uah(callback: types.CallbackQuery, state: FSMContext):
 
 ⚠️ Без чека ключ НЕ будет выдан"""
     
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=uah_receipt_keyboard())
+    await callback.message.edit_caption(caption=text, reply_markup=uah_receipt_keyboard())
     await state.set_state(States.waiting_uah_receipt)
     await callback.answer()
 
@@ -608,7 +577,7 @@ async def menu_profile(callback: types.CallbackQuery):
 📦 <b>Товар:</b> {product}
 ⏳ <b>Срок до:</b> {expires}"""
     
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=main_menu_keyboard(is_admin(callback.from_user.id)))
+    await callback.message.edit_caption(caption=text, reply_markup=main_menu_keyboard(is_admin(callback.from_user.id)))
     await callback.answer()
 
 @dp.callback_query(F.data == "menu_purchases")
@@ -627,7 +596,7 @@ async def menu_purchases(callback: types.CallbackQuery):
             text += f"   Ключ: <code>{p['key']}</code>\n"
             text += f"   Дата: {p['purchased_at']}\n\n"
     
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=main_menu_keyboard(is_admin(callback.from_user.id)))
+    await callback.message.edit_caption(caption=text, reply_markup=main_menu_keyboard(is_admin(callback.from_user.id)))
     await callback.answer()
 
 # ========== АДМИН-ПАНЕЛЬ ==========
@@ -642,7 +611,7 @@ async def menu_admin(callback: types.CallbackQuery):
     pending_crypto = len([p for p in data["pending_crypto"] if p.startswith("crypto_")])
     
     text = f"🔧 <b>Админ-панель</b>\n\n📊 Ожидает подтверждения UAH: {pending_uah}\n💎 Ожидает подтверждения CRYPTO: {pending_crypto}\n\nВыберите действие:"
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=admin_panel_keyboard())
+    await callback.message.edit_caption(caption=text, reply_markup=admin_panel_keyboard())
     await callback.answer()
 
 @dp.callback_query(F.data == "admin_give_key")
@@ -652,7 +621,7 @@ async def admin_give_key(callback: types.CallbackQuery, state: FSMContext):
         return
     
     text = "✏️ <b>Введите ID пользователя:</b>\n\n(можно найти в профиле пользователя)"
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=cancel_keyboard())
+    await callback.message.edit_caption(caption=text, reply_markup=cancel_keyboard())
     await state.set_state(States.admin_waiting_user_id)
     await callback.answer()
 
@@ -672,7 +641,7 @@ async def admin_confirm_uah(callback: types.CallbackQuery, state: FSMContext):
     builder.button(text="🔙 Назад", callback_data="menu_admin")
     builder.adjust(1)
     
-    await callback.message.edit_text("📋 <b>Выберите UAH оплату для подтверждения:</b>", parse_mode="HTML", reply_markup=builder.as_markup())
+    await callback.message.edit_caption(caption="📋 <b>Выберите UAH оплату для подтверждения:</b>", reply_markup=builder.as_markup())
     await callback.answer()
 
 @dp.callback_query(F.data == "admin_confirm_crypto")
@@ -695,7 +664,7 @@ async def admin_confirm_crypto(callback: types.CallbackQuery, state: FSMContext)
     builder.button(text="🔙 Назад", callback_data="menu_admin")
     builder.adjust(1)
     
-    await callback.message.edit_text("📋 <b>Выберите CRYPTO оплату для подтверждения:</b>", parse_mode="HTML", reply_markup=builder.as_markup())
+    await callback.message.edit_caption(caption="📋 <b>Выберите CRYPTO оплату для подтверждения:</b>", reply_markup=builder.as_markup())
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("confirm_uah_"))
@@ -719,7 +688,7 @@ async def confirm_uah_payment(callback: types.CallbackQuery, state: FSMContext):
     )
     
     text = f"✏️ <b>Введите ключ для пользователя @{pending['username']}</b>\n\nТовар: {pending['product']} ({pending['period']})"
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=cancel_keyboard())
+    await callback.message.edit_caption(caption=text, reply_markup=cancel_keyboard())
     await state.set_state(States.admin_waiting_uah_key)
     await callback.answer()
 
@@ -747,7 +716,7 @@ async def confirm_crypto_payment(callback: types.CallbackQuery, state: FSMContex
     )
     
     text = f"✏️ <b>Введите ключ для пользователя @{user.get('username', 'user')}</b>\n\nТовар: {pending['product_name']} ({pending['period']})"
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=cancel_keyboard())
+    await callback.message.edit_caption(caption=text, reply_markup=cancel_keyboard())
     await state.set_state(States.admin_waiting_crypto_key)
     await callback.answer()
 
@@ -855,7 +824,7 @@ async def back_to_main(callback: types.CallbackQuery, state: FSMContext):
 async def back_to_catalog(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
     text = "📋 <b>Выберите игру:</b>"
-    await bot.send_message(callback.message.chat.id, text, parse_mode="HTML", reply_markup=catalog_keyboard())
+    await send_photo_with_caption(callback.message.chat.id, CATALOG_PHOTO, text, catalog_keyboard())
     await callback.answer()
 
 @dp.callback_query(F.data == "back_to_products")
@@ -863,7 +832,7 @@ async def back_to_products(callback: types.CallbackQuery, state: FSMContext):
     data_state = await state.get_data()
     game = data_state.get("game", "oxide")
     text = f"🎮 <b>{'Oxide Survival Island' if game == 'oxide' else 'Standoff 2'} - Выберите софт:</b>"
-    await bot.send_message(callback.message.chat.id, text, parse_mode="HTML", reply_markup=products_keyboard(game))
+    await send_photo_with_caption(callback.message.chat.id, GAME_SELECT_PHOTO, text, products_keyboard(game))
     await callback.answer()
 
 @dp.callback_query(F.data == "back_to_periods")
@@ -876,7 +845,7 @@ async def back_to_periods(callback: types.CallbackQuery, state: FSMContext):
         return
     product_name = PRODUCT_NAMES[product]
     text = f"📦 <b>{product_name}</b>\n\nВыберите период:"
-    await bot.send_message(callback.message.chat.id, text, parse_mode="HTML", reply_markup=periods_keyboard(product))
+    await send_photo_with_caption(callback.message.chat.id, PERIOD_PHOTO, text, periods_keyboard(product))
     await callback.answer()
 
 @dp.callback_query(F.data == "cancel")
